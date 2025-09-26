@@ -55,24 +55,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           Text("Contraseña", style: AppTitles.h3),
                           SizedBox(height: 10.0),
                           PasswordInputW(controller: _passwordController),
-                          ListenableBuilder(
-                            listenable: widget.viewModel,
-                            builder: (context, _) {
-                              return Container(
-                                margin: EdgeInsets.all(15.0),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text("Recuérdame", style: AppTexts.body1),
-                                    Checkbox(
-                                      value: widget.viewModel.rememberMe,
-                                      onChanged:
-                                          widget.viewModel.toggleRememberMe,
-                                    ),
-                                  ],
+                          Container(
+                            margin: EdgeInsets.all(15.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text("Recuérdame", style: AppTexts.body1),
+                                Checkbox(
+                                  value: widget.viewModel.rememberMe,
+                                  onChanged: widget.viewModel.toggleRememberMe,
                                 ),
-                              );
-                            },
+                              ],
+                            ),
                           ),
                           Row(
                             children: [
@@ -133,9 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final success = await widget.viewModel.login(email, password);
 
-      if (!mounted) return;
-
-      if (success) {
+      if (success && mounted) {
         context.goNamed('home');
       }
     }
