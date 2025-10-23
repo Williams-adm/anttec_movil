@@ -22,7 +22,7 @@ class _BrandPageState extends State<BrandPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Listado de Marcas")),
+      appBar: AppBar(title: const Text("Filtro")),
       body: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
