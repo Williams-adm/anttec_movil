@@ -2,6 +2,7 @@ import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/core/styles/texts.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:anttec_movil/app/ui/brand/brand_page.dart';
 
 class SectionTitleW extends StatelessWidget {
   final String title;
@@ -16,15 +17,24 @@ class SectionTitleW extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // 🟦 Título de la sección
           Text(
             title,
             style: AppTexts.body1M.copyWith(color: AppColors.extradarkT),
           ),
+
+          // 🟨 Botón de filtros
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              // Navega a la pantalla de marcas
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BrandPage()),
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.secondaryS,
-              padding: EdgeInsets.only(left: 12.0, right: 6.0),
+              padding: const EdgeInsets.only(left: 12.0, right: 6.0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10.0),
               ),
@@ -35,7 +45,7 @@ class SectionTitleW extends StatelessWidget {
                   "Filtros",
                   style: AppTexts.body1M.copyWith(color: AppColors.darkT),
                 ),
-                SizedBox(width: 8.0),
+                const SizedBox(width: 8.0),
                 Icon(Symbols.filter_alt, size: 24, color: AppColors.darkT),
               ],
             ),
