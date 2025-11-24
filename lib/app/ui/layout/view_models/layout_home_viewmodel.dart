@@ -23,7 +23,6 @@ class LayoutHomeViewmodel extends ChangeNotifier {
   List<CategoryModel> get categories => _categories;
   String? get errorMessage => _errorMessage;
   bool get isloading => _isloading;
-
   String? get profileName => _profileName;
 
   Future<void> loadCategories() async {
@@ -45,7 +44,6 @@ class LayoutHomeViewmodel extends ChangeNotifier {
 
   Future<void> loadProfile() async {
     _profileName = await _secureStorage.read(key: 'profile_name');
-
     notifyListeners();
   }
 

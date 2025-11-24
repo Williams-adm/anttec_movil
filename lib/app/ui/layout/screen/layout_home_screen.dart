@@ -31,22 +31,24 @@ class _LayoutHomeScreenState extends State<LayoutHomeScreen> {
     return ListenableBuilder(
       listenable: widget.viewmodel,
       builder: (context, _) {
-        return LoaderW(
-          isLoading: widget.viewmodel.isloading,
-          child: Column(
-            children: [
-              HeaderHomeW(
-                profileName: widget.viewmodel.profileName ?? '',
-                logout: _handleLogout,
-              ),
-              Form(
-                key: _formKey,
-                child: SearchW(controller: _searchController),
-              ),
-              CategoryFilterW(categories: widget.viewmodel.categories),
-              SectionTitleW(),
-              Expanded(child: widget.content),
-            ],
+        return Scaffold(
+          body: LoaderW(
+            isLoading: widget.viewmodel.isloading,
+            child: Column(
+              children: [
+                HeaderHomeW(
+                  profileName: widget.viewmodel.profileName ?? '',
+                  logout: _handleLogout,
+                ),
+                Form(
+                  key: _formKey,
+                  child: SearchW(controller: _searchController),
+                ),
+                CategoryFilterW(categories: widget.viewmodel.categories),
+                SectionTitleW(),
+                Expanded(child: widget.content),
+              ],
+            ),
           ),
         );
       },
