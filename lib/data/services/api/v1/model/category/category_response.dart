@@ -6,15 +6,15 @@ class CategoryResponse {
   final bool success;
   final String message;
   final List<CategoryModel> data;
-  final LinksModel links;
-  final MetaModel meta;
+  final LinksModel? links; // Opcional, para casos donde no venga en el backend
+  final MetaModel? meta; // Opcional, para casos donde no venga en el backend
 
   CategoryResponse({
     required this.success,
     required this.message,
     required this.data,
-    required this.links,
-    required this.meta,
+    this.links,
+    this.meta,
   });
 
   factory CategoryResponse.fromJson(Map<String, dynamic> json) {
@@ -24,8 +24,9 @@ class CategoryResponse {
       data: (json['data'] as List)
           .map((e) => CategoryModel.fromJson(e))
           .toList(),
-      links: LinksModel.fromJson(json['links']),
-      meta: MetaModel.fromJson(json['meta']),
+      // Si el backend no envía estos campos, se asigna null
+      links: json['links'] != null ? LinksModel.fromJson(json['links']) : null,
+      meta: json['meta'] != null ? MetaModel.fromJson(json['meta']) : null,
     );
   }
 }

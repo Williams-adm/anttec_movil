@@ -7,11 +7,8 @@ class CategoryService extends ApiService {
 
   Future<CategoryResponse> categoryAll() async {
     try {
-      final response = await dio.get('/admin/categories');
-
-      final categoryResponse = CategoryResponse.fromJson(response.data);
-
-      return categoryResponse;
+      final response = await dio.get('/mobile/categories');
+      return CategoryResponse.fromJson(response.data);
     } on DioException catch (e) {
       throw Exception(e.error);
     }
