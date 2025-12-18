@@ -4,4 +4,5 @@ abstract final class Routes {
   static const home = '/home';
   static const scan = '/scan';
   static const cart = '/cart';
+  static const finalizarVenta = '/finalizar-venta';
 }
