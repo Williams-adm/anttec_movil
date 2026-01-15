@@ -8,7 +8,7 @@ class ApiService {
   ApiService({String? baseUrl})
     : dio = Dio(
         BaseOptions(
-          baseUrl: 'http://192.168.1.4/anttec-back/public/api/v1',
+          baseUrl: 'https://anttec-back-master-gicfjw.laravel.cloud/api/v1',
           connectTimeout: const Duration(seconds: 20),
           receiveTimeout: const Duration(seconds: 20),
           headers: {

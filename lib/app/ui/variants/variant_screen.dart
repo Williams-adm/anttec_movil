@@ -22,23 +22,18 @@ class _VariantScreenState extends State<VariantScreen> {
   final PageController _pageController = PageController();
   final Color _primaryColor = const Color(0xFF7E33A3);
 
-  // --- CORRECCIÓN DE IMÁGENES ---
   String _fixImageUrl(String? url) {
     if (url == null || url.isEmpty) {
       return 'https://via.placeholder.com/300';
     }
 
-    // 1. Si la URL viene con 'anttec-back.test' (Tu Virtual Host)
-    if (url.contains('anttec-back.test')) {
-      // Reemplazamos por 10.0.2.2 (IP del Host en Emulador Android).
-      // NOTA: Si usas 'php artisan serve', añade :8000 al final.
-      // Si usas Laragon/XAMPP directo en puerto 80, déjalo solo como '10.0.2.2'.
-      return url.replaceAll('anttec-back.test', '10.0.2.2:8000');
-    }
-
-    // 2. Si la URL viene con 'localhost'
-    if (url.contains('localhost')) {
-      return url.replaceAll('localhost', '10.0.2.2:8000');
+    if (url.contains('192.168.1.4') ||
+        url.contains('localhost') ||
+        url.contains('anttec-back.test')) {
+      return url.replaceAll(
+        RegExp(r'http://[^/]+'),
+        'https://anttec-back-master-gicfjw.laravel.cloud',
+      );
     }
 
     return url;
@@ -102,13 +97,10 @@ class _VariantScreenState extends State<VariantScreen> {
 
             final data = controller.product!;
             final variant = data.selectedVariant;
-
-            // Obtenemos las imágenes (ya son strings)
             final List<String> images = variant.images.isNotEmpty
                 ? variant.images
                 : [''];
 
-            // Lógica de reseteo de cantidad
             if (_quantity > variant.stock && variant.stock > 0) {
               _quantity = variant.stock;
             } else if (variant.stock == 0) {
@@ -136,63 +128,61 @@ class _VariantScreenState extends State<VariantScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // CARRUSEL
                   SizedBox(
-                    height: 250,
+                    height: 280,
                     child: Stack(
                       children: [
                         PageView.builder(
                           controller: _pageController,
                           itemCount: images.length,
                           itemBuilder: (context, index) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 40,
+                            return Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(color: Colors.grey.shade100),
                               ),
-                              child: Image.network(
-                                _fixImageUrl(images[index]),
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) {
-                                  // Si falla, mostramos icono gris
-                                  return const Center(
-                                    child: Icon(
-                                      Icons.broken_image,
-                                      size: 50,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.network(
+                                  _fixImageUrl(images[index]),
+                                  fit: BoxFit.contain,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(
+                                        Icons.broken_image,
+                                        size: 80,
+                                        color: Colors.grey,
+                                      ),
+                                ),
                               ),
                             );
                           },
                         ),
                         if (images.length > 1)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              icon: const Icon(Icons.arrow_back_ios, size: 30),
-                              onPressed: () {
-                                _pageController.previousPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
-                            ),
-                          ),
-                        if (images.length > 1)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.arrow_forward_ios,
-                                size: 30,
-                              ),
-                              onPressed: () {
-                                _pageController.nextPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
+                          Positioned.fill(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _navButton(Icons.arrow_back_ios_new, () {
+                                  _pageController.previousPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                }),
+                                _navButton(Icons.arrow_forward_ios, () {
+                                  _pageController.nextPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                }),
+                              ],
                             ),
                           ),
                       ],
@@ -200,7 +190,6 @@ class _VariantScreenState extends State<VariantScreen> {
                   ),
 
                   const SizedBox(height: 20),
-
                   Text(
                     "SKU: ${variant.sku}",
                     style: const TextStyle(
@@ -217,7 +206,7 @@ class _VariantScreenState extends State<VariantScreen> {
                   ),
                   const SizedBox(height: 8),
                   Wrap(
-                    spacing: 10,
+                    spacing: 12,
                     children: data.variants.map((vOption) {
                       final colorFeature = vOption.features.firstWhere(
                         (f) => f.type == 'color',
@@ -243,17 +232,30 @@ class _VariantScreenState extends State<VariantScreen> {
                           setState(() => _quantity = 1);
                         },
                         child: Container(
-                          width: 35,
-                          height: 35,
+                          width: 38,
+                          height: 38,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: colorInt != null
                                 ? Color(colorInt)
                                 : Colors.grey,
                             border: Border.all(
-                              color: isSelected ? Colors.black : Colors.black12,
-                              width: isSelected ? 2 : 1,
+                              color: isSelected
+                                  ? _primaryColor
+                                  : Colors.black12,
+                              width: isSelected ? 3 : 1,
                             ),
+                            // CORRECCIÓN: withValues en lugar de withOpacity
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: _primaryColor.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
                           ),
                           child: isSelected
                               ? Icon(
@@ -269,90 +271,79 @@ class _VariantScreenState extends State<VariantScreen> {
                     }).toList(),
                   ),
 
-                  const SizedBox(height: 20),
-
+                  const SizedBox(height: 25),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "Stock  $currentDisplayedStock",
+                        "Stock: $currentDisplayedStock",
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        "Precio  S/. ${variant.price.toStringAsFixed(2)}",
-                        style: const TextStyle(
-                          fontSize: 18,
+                        "S/. ${variant.price.toStringAsFixed(2)}",
+                        style: TextStyle(
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
+                          color: _primaryColor,
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 20),
-
+                  const SizedBox(height: 25),
                   const Text(
                     "Cantidad",
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-
                   Row(
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: variant.stock > 0
-                                  ? _decrementQuantity
-                                  : null,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 40,
-                                minHeight: 40,
+                            _qtyBtn(
+                              Icons.remove,
+                              variant.stock > 0 ? _decrementQuantity : null,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                              ),
+                              child: Text(
+                                "$_quantity",
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            Text(
-                              "$_quantity",
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: variant.stock > 0
+                            _qtyBtn(
+                              Icons.add,
+                              variant.stock > 0
                                   ? () => _incrementQuantity(variant.stock)
                                   : null,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 40,
-                                minHeight: 40,
-                              ),
                             ),
                           ],
                         ),
                       ),
-
-                      const SizedBox(width: 20),
-
+                      const SizedBox(width: 15),
                       Expanded(
                         child: SizedBox(
-                          height: 45,
+                          height: 50,
                           child: ElevatedButton(
                             onPressed: variant.stock > 0
                                 ? () {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          "Agregado $_quantity unidad(es) de ${data.name}",
+                                          "Agregado $_quantity de ${data.name}",
                                         ),
                                         backgroundColor: Colors.green,
                                       ),
@@ -363,15 +354,13 @@ class _VariantScreenState extends State<VariantScreen> {
                               backgroundColor: _primaryColor,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             child: Text(
-                              variant.stock > 0 ? "Agregar" : "Agotado",
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              variant.stock > 0
+                                  ? "Agregar al carrito"
+                                  : "Agotado",
                             ),
                           ),
                         ),
@@ -380,7 +369,6 @@ class _VariantScreenState extends State<VariantScreen> {
                   ),
 
                   const SizedBox(height: 30),
-
                   const Text(
                     "Descripción",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -394,27 +382,32 @@ class _VariantScreenState extends State<VariantScreen> {
                       height: 1.5,
                     ),
                   ),
-
-                  const SizedBox(height: 20),
-
-                  GestureDetector(
-                    onTap: () {},
-                    child: const Text(
-                      "Ficha Técnica",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 50),
+                  const SizedBox(height: 100),
                 ],
               ),
             );
           },
         ),
       ),
+    );
+  }
+
+  Widget _navButton(IconData icon, VoidCallback onTap) {
+    return IconButton(
+      icon: CircleAvatar(
+        // CORRECCIÓN: withValues en lugar de withOpacity
+        backgroundColor: Colors.white.withValues(alpha: 0.8),
+        child: Icon(icon, size: 18, color: Colors.black),
+      ),
+      onPressed: onTap,
+    );
+  }
+
+  Widget _qtyBtn(IconData icon, VoidCallback? onPressed) {
+    return IconButton(
+      icon: Icon(icon, size: 20),
+      onPressed: onPressed,
+      constraints: const BoxConstraints(minWidth: 45, minHeight: 45),
     );
   }
 }
