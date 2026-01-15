@@ -1,10 +1,13 @@
 import 'package:anttec_movil/data/services/api/v1/api_service.dart';
 import 'package:anttec_movil/data/services/api/v1/model/product/product_response.dart';
+// Asegúrate de haber creado este archivo con el modelo que te pasé en el paso anterior
+import 'package:anttec_movil/data/services/api/v1/model/product/product_detail_response.dart';
 import 'package:dio/dio.dart';
 
 class ProductService extends ApiService {
   ProductService() : super();
 
+  /// Obtener lista de productos con paginación y filtros
   Future<ProductResponse> productAll({
     int page = 1,
     int? brand,
@@ -14,7 +17,7 @@ class ProductService extends ApiService {
     int? subcategory,
   }) async {
     try {
-      // Construimos los parámetros de consulta
+      // 1. Construimos el mapa de parámetros dinámicamente
       final Map<String, dynamic> queryParams = {'page': page};
 
       if (brand != null) queryParams['brand'] = brand;
@@ -24,17 +27,35 @@ class ProductService extends ApiService {
       if (subcategory != null) queryParams['subcategory'] = subcategory;
 
       final response = await dio.get(
-        '/mobile/products', // Asegúrate de que esta sea la ruta correcta
+        '/mobile/products',
         queryParameters: queryParams,
       );
 
-      final productResponse = ProductResponse.fromJson(response.data);
-      return productResponse;
+      return ProductResponse.fromJson(response.data);
     } on DioException catch (e) {
-      // Manejo de errores de Dio
       throw Exception(e.response?.data['message'] ?? e.message);
     } catch (e) {
-      throw Exception("Error desconocido: $e");
+      throw Exception("Error inesperado: $e");
+    }
+  }
+
+  /// Obtener el detalle de un producto y una variante específica
+  /// Endpoint: /mobile/products/{id}/variants/{variantId}
+  Future<ProductDetailResponse> productDetail({
+    required int productId,
+    required int variantId,
+  }) async {
+    try {
+      final response = await dio.get(
+        '/mobile/products/$productId/variants/$variantId',
+      );
+
+      return ProductDetailResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      // Manejo de error si el producto o la variante no existen
+      throw Exception(e.response?.data['message'] ?? e.message);
+    } catch (e) {
+      throw Exception("Error inesperado al cargar detalle: $e");
     }
   }
 }

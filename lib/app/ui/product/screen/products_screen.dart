@@ -1,7 +1,16 @@
-// app/ui/product/screen/products_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+
+// --- VIEW MODELS & CONTROLLERS ---
+import 'package:anttec_movil/app/ui/layout/view_models/layout_home_viewmodel.dart';
 import 'package:anttec_movil/app/ui/product/controllers/products_controller.dart';
+
+// --- WIDGETS ---
+import 'package:anttec_movil/app/ui/layout/widgets/home/header_home_w.dart';
+import 'package:anttec_movil/app/ui/layout/widgets/home/search_w.dart';
+import 'package:anttec_movil/app/ui/layout/widgets/home/category_filter_w.dart';
+import 'package:anttec_movil/app/ui/layout/widgets/home/section_title_w.dart';
 import 'package:anttec_movil/app/ui/product/screen/products_grid.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -13,7 +22,10 @@ class ProductsScreen extends StatefulWidget {
 }
 
 class _ProductsScreenState extends State<ProductsScreen> {
+  // Controlador para el scroll infinito
   final ScrollController _scrollController = ScrollController();
+  // Controlador para el buscador (lo movimos aquí desde el layout)
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -24,49 +36,129 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  // Detectar cuando llegamos al final de la lista
+  // Detectar cuando llegamos al final de la lista para cargar más
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
-      // Usamos read porque estamos fuera del build
-      final controller = context.read<ProductsController>();
+      // Usamos read() porque estamos dentro de un evento, no redibujando
+      // Nota: El controller se accede a través del contexto del Consumer más abajo,
+      // pero aquí accedemos via context si el provider está arriba o usamos una variable local si fuera necesario.
+      // Para seguridad, verificamos si el widget sigue montado.
+      if (!mounted) return;
 
-      // Solo pedimos siguiente página si no está cargando ya y hay más páginas
-      if (!controller.loading && controller.page < controller.lastPage) {
-        controller.nextPage();
-      }
+      // IMPORTANTE: Como ProductsController se crea dentro del build,
+      // la forma más segura de accederlo aquí es si el Provider estuviera arriba
+      // o pasando el controlador a una función.
+      // Pero como usamos Consumer abajo, la lógica de paginación suele manejarse mejor
+      // pasando el scrollController al Grid, o envolviendo todo en el Provider.
+      // *En este diseño específico*, el ScrollController se pasa al GridView,
+      // así que la detección la hacemos aquí buscando el Provider en el contexto hijo o padre.
+
+      // Truco: ProductsController es hijo de este Widget, así que no podemos usar context.read directo aquí
+      // a menos que movamos el ChangeNotifierProvider al padre.
+      // SIN EMBARGO, para que funcione simple, pasaremos la lógica de carga al Grid o usaremos el context
+      // disponible dentro del Consumer.
+      // *Corrección para tu caso:* Como el Provider se crea en el build, lo mejor es pasar el callback
+      // desde el Consumer o mover el Provider al initState.
+      // Para no complicar, dejaremos que el Grid maneje el scroll o usaremos un GlobalKey si fuera estricto.
+      // Pero, dado que _scrollController se pasa al GridView, el listener funciona.
+      // La forma correcta accediendo al árbol descendente es compleja, así que asumiremos
+      // que ProductsController se puede obtener si lo elevamos o usamos un truco.
+
+      // *Solución Práctica:* Vamos a acceder al controlador buscando en el contexto
+      // PERO, como el Provider se crea en el build, context.read<ProductsController> fallará aquí.
+      // -> Lo ideal: Mover ChangeNotifierProvider encima de Scaffold o usar un Builder.
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos los datos del Layout (Perfil, Categorías) que vienen del padre
+    final layoutModel = context.watch<LayoutHomeViewmodel>();
+
     return ChangeNotifierProvider(
       create: (_) => ProductsController(token: widget.token),
-      child: Consumer<ProductsController>(
-        builder: (context, controller, _) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text("Productos"),
-              actions: [
-                // Botón de Filtros
-                IconButton(
-                  icon: const Icon(Icons.tune), // Icono de filtros
-                  onPressed: () => _showFiltersModal(context, controller),
-                ),
-              ],
-            ),
-            body: _buildBody(controller),
+      child: Builder(
+        builder: (context) {
+          // Usamos Builder para tener un contexto que contenga ProductsController
+          // Ahora sí podemos usar el ScrollListener correctamente si quisiéramos
+          final productsController = context.read<ProductsController>();
+
+          // Re-asignamos el listener para asegurar que tenga acceso al controlador correcto
+          _scrollController.removeListener(_onScroll); // Limpieza preventiva
+          _scrollController.addListener(() {
+            if (_scrollController.position.pixels >=
+                _scrollController.position.maxScrollExtent - 200) {
+              if (!productsController.loading &&
+                  productsController.page < productsController.lastPage) {
+                productsController.nextPage();
+              }
+            }
+          });
+
+          return Consumer<ProductsController>(
+            builder: (context, controller, _) {
+              return Column(
+                children: [
+                  // ---------------------------------------------------------
+                  // 1. ZONA DE CABECERA (Header, Buscador, Categorías)
+                  // ---------------------------------------------------------
+                  // Al estar aquí dentro, se irá junto con la pantalla al navegar.
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      children: [
+                        // Header (Perfil + Logout)
+                        HeaderHomeW(
+                          profileName: layoutModel.profileName ?? '',
+                          logout: () async {
+                            final success = await layoutModel.logout();
+                            if (success && context.mounted) {
+                              context.goNamed('login');
+                            }
+                          },
+                        ),
+
+                        // Buscador
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: SearchW(controller: _searchController),
+                        ),
+
+                        // Filtro de Categorías
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: CategoryFilterW(
+                            categories: layoutModel.categories,
+                          ),
+                        ),
+
+                        // Título de Sección "Productos"
+                        const SectionTitleW(),
+                      ],
+                    ),
+                  ),
+
+                  // ---------------------------------------------------------
+                  // 2. LISTA DE PRODUCTOS (GRID)
+                  // ---------------------------------------------------------
+                  Expanded(child: _buildProductContent(controller)),
+                ],
+              );
+            },
           );
         },
       ),
     );
   }
 
-  Widget _buildBody(ProductsController controller) {
-    // 1. Cargando inicial (pantalla completa)
+  Widget _buildProductContent(ProductsController controller) {
+    // 1. Cargando inicial
     if (controller.loading && controller.products.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -88,7 +180,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       );
     }
 
-    // 3. Lista vacía
+    // 3. Vacío
     if (controller.products.isEmpty) {
       return const Center(child: Text('No hay productos disponibles.'));
     }
@@ -97,132 +189,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return ProductGrid(
       products: controller.products,
       scrollController: _scrollController,
-      // isLoadingMore es verdadero si está cargando pero YA tenemos productos visualizándose
       isLoadingMore: controller.loading && controller.products.isNotEmpty,
-    );
-  }
-
-  // --- MODAL DE FILTROS ---
-  void _showFiltersModal(BuildContext context, ProductsController controller) {
-    // Controladores temporales para los inputs
-    final minPriceCtrl = TextEditingController();
-    final maxPriceCtrl = TextEditingController();
-    // Aquí puedes agregar dropdowns para Marcas o Categorías
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, // Permite que el modal suba con el teclado
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: 20,
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Filtros",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 10),
-
-              const Text(
-                "Rango de Precios (S/.)",
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: minPriceCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: "Mínimo",
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        prefixText: "S/. ",
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: TextField(
-                      controller: maxPriceCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: "Máximo",
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        prefixText: "S/. ",
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 25),
-
-              // Botones de Acción
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        controller.clearFilters();
-                        Navigator.pop(ctx);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                      ),
-                      child: const Text("Limpiar"),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Aplicar lógica
-                        controller.applyFilters(
-                          minPrice: double.tryParse(minPriceCtrl.text),
-                          maxPrice: double.tryParse(maxPriceCtrl.text),
-                          // Agrega aquí brand o category si tienes dropdowns
-                        );
-                        Navigator.pop(ctx);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        backgroundColor: Colors.blueAccent, // Color de tu marca
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text("Aplicar Filtros"),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
