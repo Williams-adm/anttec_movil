@@ -1,4 +1,3 @@
-// En lib/app/ui/variants/variant.screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:anttec_movil/app/ui/variants/controllers/variant_controller.dart';
@@ -14,12 +13,15 @@ class VariantScreen extends StatelessWidget {
     this.initialVariantId = 1,
   });
 
+  // Función para corregir URLs locales (Emulador)
   String _fixImageUrl(String? url) {
     if (url == null || url.isEmpty) return 'https://via.placeholder.com/300';
-    if (url.contains('anttec-back.test'))
+    if (url.contains('anttec-back.test')) {
       return url.replaceAll('anttec-back.test', '10.0.2.2:8000');
-    if (url.contains('localhost'))
+    }
+    if (url.contains('localhost')) {
       return url.replaceAll('localhost', '10.0.2.2:8000');
+    }
     return url;
   }
 
@@ -30,7 +32,7 @@ class VariantScreen extends StatelessWidget {
           VariantController(productId: productId, variantId: initialVariantId),
       child: Scaffold(
         backgroundColor: Colors.white,
-        // AppBar sencillo
+        // AppBar sencillo con botón de atrás
         appBar: AppBar(
           title: const Text(
             "Detalle",
@@ -46,12 +48,18 @@ class VariantScreen extends StatelessWidget {
         ),
         body: Consumer<VariantController>(
           builder: (context, controller, _) {
-            if (controller.loading)
+            // 1. Estado de Carga
+            if (controller.loading) {
               return const Center(child: CircularProgressIndicator());
-            if (controller.error != null)
+            }
+            // 2. Estado de Error
+            if (controller.error != null) {
               return Center(child: Text(controller.error!));
-            if (controller.product == null)
+            }
+            // 3. Estado Vacío
+            if (controller.product == null) {
               return const Center(child: Text("Producto no encontrado"));
+            }
 
             final data = controller.product!;
             final variant = data.selectedVariant;
@@ -61,8 +69,9 @@ class VariantScreen extends StatelessWidget {
 
             return Column(
               children: [
-                // Usamos Expanded para que la info ocupe todo el espacio disponible
-                // (respetando tu barra inferior original que aparecerá abajo)
+                // ---------------------------------------------------------
+                // A. CONTENIDO SCROLLABLE (Imagen + Info)
+                // ---------------------------------------------------------
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
@@ -79,6 +88,7 @@ class VariantScreen extends StatelessWidget {
                           ),
                           child: Stack(
                             children: [
+                              // Imagen Centrada
                               Center(
                                 child: Padding(
                                   padding: const EdgeInsets.all(20.0),
@@ -93,6 +103,7 @@ class VariantScreen extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                              // Precio Flotante
                               Positioned(
                                 bottom: 15,
                                 right: 15,
@@ -125,6 +136,7 @@ class VariantScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Marca y Nombre
                               Center(
                                 child: Column(
                                   children: [
@@ -151,7 +163,7 @@ class VariantScreen extends StatelessWidget {
 
                               const SizedBox(height: 25),
 
-                              // Colores
+                              // Selector de Colores (Variantes)
                               if (data.variants.isNotEmpty) ...[
                                 const Text(
                                   "Colores disponibles:",
@@ -164,6 +176,7 @@ class VariantScreen extends StatelessWidget {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: data.variants.map((vOption) {
+                                    // Buscamos la característica de tipo "color"
                                     final colorFeature = vOption.features
                                         .firstWhere(
                                           (f) => f.type == 'color',
@@ -171,11 +184,13 @@ class VariantScreen extends StatelessWidget {
                                             id: 0,
                                             option: '',
                                             type: '',
-                                            value: '#cccccc',
+                                            value: '#cccccc', // Default gris
                                             description: '',
                                           ),
                                         );
+
                                     final isSelected = vOption.id == variant.id;
+                                    // Convertimos hex string (#ff0000) a int (0xff0000)
                                     final colorHex = colorFeature.value
                                         .replaceAll('#', '0xff');
                                     final colorInt = int.tryParse(colorHex);
@@ -241,7 +256,9 @@ class VariantScreen extends StatelessWidget {
                                 ),
                               ),
 
-                              const SizedBox(height: 40), // Espacio final
+                              const SizedBox(
+                                height: 40,
+                              ), // Espacio extra al final
                             ],
                           ),
                         ),
@@ -249,9 +266,59 @@ class VariantScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                // --- ❌ AQUÍ HE ELIMINADO LA BARRA INFERIOR FALSA ---
-                // Al no haber nada aquí, Flutter mostrará el fondo del Scaffold
-                // y tu barra de navegación principal (la morada) seguirá visible abajo.
+
+                // ---------------------------------------------------------
+                // B. BOTÓN AGREGAR AL CARRITO (Fijo abajo)
+                // ---------------------------------------------------------
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      // Solo habilitado si hay stock
+                      onPressed: variant.stock > 0
+                          ? () {
+                              // AQUÍ VA LA LÓGICA DE AGREGAR AL CARRITO
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    "Agregado: ${data.name} - S/. ${variant.price}",
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent, // Color principal
+                        foregroundColor: Colors.white, // Color texto/icono
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.shopping_cart_outlined),
+                      label: Text(
+                        variant.stock > 0 ? "Agregar al Carrito" : "Agotado",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             );
           },

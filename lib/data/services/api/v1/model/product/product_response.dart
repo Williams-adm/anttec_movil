@@ -1,11 +1,9 @@
-// lib/data/services/api/v1/model/product/product_response.dart
-
 class ProductResponse {
   final bool success;
   final String message;
   final List<Product> data;
   final Map<String, dynamic> links;
-  final Meta? meta; // Cambiado de Map a Meta (clase personalizada)
+  final Meta? meta;
 
   ProductResponse({
     required this.success,
@@ -33,13 +31,11 @@ class ProductResponse {
               .toList() ??
           [],
       links: (json['links'] as Map?)?.cast<String, dynamic>() ?? {},
-      // Aquí usamos la clase Meta
       meta: json['meta'] != null ? Meta.fromJson(json['meta']) : null,
     );
   }
 }
 
-// --- NUEVA CLASE META ---
 class Meta {
   final int currentPage;
   final int lastPage;
@@ -56,7 +52,7 @@ class Meta {
   factory Meta.fromJson(Map<String, dynamic> json) {
     return Meta(
       currentPage: json['current_page'] ?? 1,
-      lastPage: json['last_page'] ?? 1, // Esto es lo que busca tu controlador
+      lastPage: json['last_page'] ?? 1,
       perPage: json['per_page'] ?? 15,
       total: json['total'] ?? 0,
     );
@@ -76,6 +72,7 @@ class Product {
   final double price;
   final double? oldPrice;
   final String? imageUrl;
+  final int? defaultVariantId; // El ID de la variante para navegar
 
   Product({
     required this.id,
@@ -90,6 +87,7 @@ class Product {
     required this.price,
     this.oldPrice,
     this.imageUrl,
+    this.defaultVariantId,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -100,6 +98,34 @@ class Product {
       if (value is String) return value == '1' || value.toLowerCase() == 'true';
       return false;
     }
+
+    // --- LÓGICA DE EXTRACCIÓN DEL OBJETO VARIANT ---
+    // Según tu JSON, la info importante está dentro de "variant": {...}
+    final variantObj = json['variant'] as Map<String, dynamic>?;
+
+    // 1. Extraer ID de la variante (Soluciona el error 404)
+    final int? variantIdVal = variantObj != null
+        ? int.tryParse(variantObj['id']?.toString() ?? '')
+        : null;
+
+    // 2. Extraer Precio (priorizamos 'selling_price' de la variante)
+    final double priceVal = variantObj != null
+        ? double.tryParse(variantObj['selling_price']?.toString() ?? '0') ?? 0.0
+        : (json['price'] != null
+              ? double.tryParse(json['price'].toString()) ?? 0.0
+              : 0.0);
+
+    // 3. Extraer Stock
+    final int stockVal = variantObj != null
+        ? int.tryParse(variantObj['stock']?.toString() ?? '0') ?? 0
+        : (json['stock'] != null
+              ? int.tryParse(json['stock'].toString()) ?? 0
+              : 0);
+
+    // 4. Extraer Imagen
+    final String? imageVal = variantObj != null
+        ? variantObj['image']?.toString()
+        : json['image_url']?.toString();
 
     return Product(
       id: json['id'] ?? 0,
@@ -116,16 +142,18 @@ class Product {
               )
               .toList() ??
           [],
-      stock: json['stock'] ?? 0,
-      price: (json['price'] is num)
-          ? (json['price'] as num).toDouble()
-          : double.tryParse(json['price']?.toString() ?? '') ?? 0,
+
+      // Asignamos los valores procesados arriba
+      stock: stockVal,
+      price: priceVal,
+      imageUrl: imageVal,
+      defaultVariantId: variantIdVal, // <--- AQUÍ ESTÁ LA SOLUCIÓN
+
       oldPrice: json['old_price'] != null
           ? ((json['old_price'] is num)
                 ? (json['old_price'] as num).toDouble()
                 : double.tryParse(json['old_price'].toString()))
           : null,
-      imageUrl: json['image_url']?.toString(),
     );
   }
 }
