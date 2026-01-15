@@ -5,14 +5,14 @@ class ProductResponse {
   final String message;
   final List<Product> data;
   final Map<String, dynamic> links;
-  final Map<String, dynamic> meta;
+  final Meta? meta; // Cambiado de Map a Meta (clase personalizada)
 
   ProductResponse({
     required this.success,
     required this.message,
     required this.data,
     required this.links,
-    required this.meta,
+    this.meta,
   });
 
   factory ProductResponse.fromJson(Map<String, dynamic> json) {
@@ -33,7 +33,32 @@ class ProductResponse {
               .toList() ??
           [],
       links: (json['links'] as Map?)?.cast<String, dynamic>() ?? {},
-      meta: (json['meta'] as Map?)?.cast<String, dynamic>() ?? {},
+      // Aquí usamos la clase Meta
+      meta: json['meta'] != null ? Meta.fromJson(json['meta']) : null,
+    );
+  }
+}
+
+// --- NUEVA CLASE META ---
+class Meta {
+  final int currentPage;
+  final int lastPage;
+  final int perPage;
+  final int total;
+
+  Meta({
+    required this.currentPage,
+    required this.lastPage,
+    required this.perPage,
+    required this.total,
+  });
+
+  factory Meta.fromJson(Map<String, dynamic> json) {
+    return Meta(
+      currentPage: json['current_page'] ?? 1,
+      lastPage: json['last_page'] ?? 1, // Esto es lo que busca tu controlador
+      perPage: json['per_page'] ?? 15,
+      total: json['total'] ?? 0,
     );
   }
 }
@@ -47,8 +72,6 @@ class Product {
   final String subcategory;
   final String brand;
   final List<Specification> specifications;
-
-  // Puedes agregar los extras para el grid aquí:
   final int stock;
   final double price;
   final double? oldPrice;
