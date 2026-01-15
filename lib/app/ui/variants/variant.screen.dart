@@ -22,17 +22,25 @@ class _VariantScreenState extends State<VariantScreen> {
   final PageController _pageController = PageController();
   final Color _primaryColor = const Color(0xFF7E33A3);
 
-  // CORRECCIÓN 1: Agregamos llaves { } a todos los if
+  // --- CORRECCIÓN DE IMÁGENES ---
   String _fixImageUrl(String? url) {
     if (url == null || url.isEmpty) {
       return 'https://via.placeholder.com/300';
     }
+
+    // 1. Si la URL viene con 'anttec-back.test' (Tu Virtual Host)
     if (url.contains('anttec-back.test')) {
-      return url.replaceAll('anttec-back.test', '192.168.1.4');
+      // Reemplazamos por 10.0.2.2 (IP del Host en Emulador Android).
+      // NOTA: Si usas 'php artisan serve', añade :8000 al final.
+      // Si usas Laragon/XAMPP directo en puerto 80, déjalo solo como '10.0.2.2'.
+      return url.replaceAll('anttec-back.test', '10.0.2.2:8000');
     }
+
+    // 2. Si la URL viene con 'localhost'
     if (url.contains('localhost')) {
-      return url.replaceAll('localhost', '192.168.1.4');
+      return url.replaceAll('localhost', '10.0.2.2:8000');
     }
+
     return url;
   }
 
@@ -82,7 +90,6 @@ class _VariantScreenState extends State<VariantScreen> {
         ),
         body: Consumer<VariantController>(
           builder: (context, controller, _) {
-            // CORRECCIÓN 1: Agregamos llaves { } a los if de carga/error
             if (controller.loading) {
               return const Center(child: CircularProgressIndicator());
             }
@@ -96,12 +103,12 @@ class _VariantScreenState extends State<VariantScreen> {
             final data = controller.product!;
             final variant = data.selectedVariant;
 
-            // CORRECCIÓN 2: Eliminamos .url porque la lista ya es de Strings
+            // Obtenemos las imágenes (ya son strings)
             final List<String> images = variant.images.isNotEmpty
                 ? variant.images
                 : [''];
 
-            // Lógica de reseteo de cantidad con llaves { }
+            // Lógica de reseteo de cantidad
             if (_quantity > variant.stock && variant.stock > 0) {
               _quantity = variant.stock;
             } else if (variant.stock == 0) {
@@ -145,6 +152,16 @@ class _VariantScreenState extends State<VariantScreen> {
                               child: Image.network(
                                 _fixImageUrl(images[index]),
                                 fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // Si falla, mostramos icono gris
+                                  return const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                },
                               ),
                             );
                           },
