@@ -25,7 +25,7 @@ dependencies:
   provider: ^6.1.5+1
 
   # Almacenamiento seguro (tokens, credenciales, etc.)
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: ^10.0.0
 
   # Manejo de conexión a internet
   connectivity_plus: ^6.0.4

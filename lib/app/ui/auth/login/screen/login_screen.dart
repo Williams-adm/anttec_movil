@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <--- NECESARIO PARA TextInput
 import 'package:go_router/go_router.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/core/styles/texts.dart';
@@ -22,18 +23,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _initialDataLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    // Escuchar cambios en el ViewModel (errores, estados de carga)
     widget.viewModel.addListener(_viewModelListener);
-
-    // LOGICA DE "RECUÉRDAME":
-    // Si al iniciar la pantalla el ViewModel ya recuperó un correo, lo ponemos.
-    if (widget.viewModel.savedEmail.isNotEmpty) {
-      _emailController.text = widget.viewModel.savedEmail;
-    }
+    _populateControllers();
   }
 
   @override
@@ -45,25 +41,25 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _viewModelListener() {
-    // 1. Manejo de errores
     if (widget.viewModel.errorMessage != null && mounted) {
       ErrorDialogW.show(context, widget.viewModel.errorMessage!);
       widget.viewModel.clearErrorMessage();
     }
+    _populateControllers();
+  }
 
-    // 2. Actualización tardía del email (si la carga fue asíncrona)
-    if (widget.viewModel.savedEmail.isNotEmpty &&
-        _emailController.text.isEmpty &&
-        mounted) {
+  void _populateControllers() {
+    if (!_initialDataLoaded &&
+        widget.viewModel.savedEmail.isNotEmpty &&
+        widget.viewModel.savedPassword.isNotEmpty) {
       _emailController.text = widget.viewModel.savedEmail;
+      _passwordController.text = widget.viewModel.savedPassword;
+      _initialDataLoaded = true;
     }
   }
 
   Future<void> _handleLogin() async {
-    // Validación del formulario (Frontend)
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    // Ocultar teclado para mejor experiencia visual
     FocusScope.of(context).unfocus();
 
     final success = await widget.viewModel.login(
@@ -72,6 +68,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
+      // --- MAGIA PARA GOOGLE SMART LOCK ---
+      // Esto le dice al celular: "El login fue exitoso, pregúntale al usuario si quiere guardar"
+      TextInput.finishAutofillContext();
+
       context.goNamed('home');
     }
   }
@@ -91,7 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 60),
-                    // Icono de la marca
                     const Icon(
                       Icons.lock_person_rounded,
                       size: 80,
@@ -107,21 +106,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     CardLoginW(
                       children: [
-                        Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildInputLabel("Correo Electrónico"),
-                              EmailInputW(controller: _emailController),
-                              const SizedBox(height: 20),
-                              _buildInputLabel("Contraseña"),
-                              PasswordInputW(controller: _passwordController),
-                              const SizedBox(height: 10),
-                              _buildRememberMe(),
-                              const SizedBox(height: 30),
-                              _buildSubmitButton(),
-                            ],
+                        // 1. Envolvemos el Form en AutofillGroup
+                        // Esto agrupa el usuario y contraseña para que Google sepa que van juntos
+                        AutofillGroup(
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildInputLabel("Correo Electrónico"),
+                                // Asegúrate que EmailInputW tenga autofillHints: [AutofillHints.email]
+                                EmailInputW(controller: _emailController),
+                                const SizedBox(height: 20),
+                                _buildInputLabel("Contraseña"),
+                                // Asegúrate que PasswordInputW tenga autofillHints: [AutofillHints.password]
+                                PasswordInputW(
+                                  controller: _passwordController,
+                                  // Opcional: Si dan "Enter" en el teclado, intenta loguear
+                                  onFieldSubmitted: _handleLogin,
+                                ),
+                                const SizedBox(height: 10),
+                                _buildRememberMe(),
+                                const SizedBox(height: 30),
+                                _buildSubmitButton(),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -135,8 +144,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  // --- Widgets Auxiliares Privados ---
 
   Widget _buildInputLabel(String label) {
     return Padding(
@@ -155,7 +162,6 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           Checkbox(
             value: widget.viewModel.rememberMe,
-            // CORRECCIÓN: 'val!' asegura que no sea nulo, eliminando el error del linter
             onChanged: (val) => widget.viewModel.toggleRememberMe(val!),
             activeColor: AppColors.primaryP,
           ),
@@ -169,11 +175,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final bool isBusy = widget.viewModel.isLoading;
 
     return ElevatedButton(
-      // Deshabilitamos el botón si está cargando
       onPressed: isBusy ? null : _handleLogin,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryP,
-        // CORRECCIÓN: Usamos .withValues() (el nuevo estándar) en lugar de .withOpacity()
         disabledBackgroundColor: AppColors.primaryP.withValues(alpha: 0.6),
         padding: const EdgeInsets.symmetric(vertical: 16.0),
         shape: RoundedRectangleBorder(
