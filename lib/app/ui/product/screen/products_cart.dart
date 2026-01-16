@@ -60,28 +60,17 @@ class ProductCard extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      // IMAGEN
+                      // IMAGEN (Sin filtro gris)
                       Expanded(
-                        child: ColorFiltered(
-                          colorFilter: isOutOfStock
-                              ? const ColorFilter.mode(
-                                  Colors.grey,
-                                  BlendMode.saturation,
-                                )
-                              : const ColorFilter.mode(
-                                  Colors.transparent,
-                                  BlendMode.multiply,
-                                ),
-                          child: Image.network(
-                            imageUrl,
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                          ),
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.contain,
+                          width: double.infinity,
                         ),
                       ),
                       const SizedBox(height: 12),
 
-                      // INFO
+                      // MARCA
                       Text(
                         product.brand.toUpperCase(),
                         style: const TextStyle(
@@ -92,6 +81,8 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
+
+                      // NOMBRE DEL PRODUCTO
                       Text(
                         product.name,
                         maxLines: 2,
@@ -104,14 +95,14 @@ class ProductCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
 
-                      // PRECIO O ESTADO
+                      // PRECIO O ESTADO AGOTADO
                       if (isOutOfStock)
                         const Text(
                           "AGOTADO",
                           style: TextStyle(
                             color: Colors.red,
                             fontWeight: FontWeight.w900,
-                            fontSize: 11,
+                            fontSize: 14, // Un poco más grande para que resalte
                           ),
                         )
                       else
@@ -128,41 +119,6 @@ class ProductCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // --- ESTILO: PÍLDORA FLOTANTE INFERIOR ---
-            if (isOutOfStock)
-              Positioned(
-                bottom: 40, // Flota justo encima del nombre/precio
-                left: 15,
-                right: 15,
-                child: Container(
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.layers_outlined,
-                        color: Colors.blue.shade700,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "Variantes disponibles",
-                        style: TextStyle(
-                          color: Colors.blue.shade800,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
           ],
         ),
       ),

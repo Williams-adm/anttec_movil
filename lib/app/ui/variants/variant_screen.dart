@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:anttec_movil/app/ui/variants/controllers/variant_controller.dart';
-import 'package:anttec_movil/data/services/api/v1/model/product/product_detail_response.dart';
+// Importamos los widgets locales
+import 'widgets/product_image_gallery.dart';
+import 'widgets/color_selector.dart';
+import 'widgets/quantity_selector.dart';
 
 class VariantScreen extends StatefulWidget {
   final int productId;
@@ -37,18 +40,6 @@ class _VariantScreenState extends State<VariantScreen> {
     }
 
     return url;
-  }
-
-  void _incrementQuantity(int maxStock) {
-    if (_quantity < maxStock) {
-      setState(() => _quantity++);
-    }
-  }
-
-  void _decrementQuantity() {
-    if (_quantity > 1) {
-      setState(() => _quantity--);
-    }
   }
 
   @override
@@ -95,18 +86,22 @@ class _VariantScreenState extends State<VariantScreen> {
               return const Center(child: Text("Producto no encontrado"));
             }
 
+            // Usamos '!' para indicar que estamos seguros que no son nulos tras las validaciones
             final data = controller.product!;
             final variant = data.selectedVariant;
-            final List<String> images = variant.images.isNotEmpty
-                ? variant.images
-                : [''];
 
-            if (_quantity > variant.stock && variant.stock > 0) {
-              _quantity = variant.stock;
-            } else if (variant.stock == 0) {
-              _quantity = 0;
-            } else if (_quantity == 0 && variant.stock > 0) {
-              _quantity = 1;
+            // Sincronización de cantidad con el stock de la variante seleccionada
+            if (variant.stock <= 0) {
+              if (_quantity != 0) {
+                _quantity = 0;
+              }
+            } else {
+              if (_quantity == 0) {
+                _quantity = 1;
+              }
+              if (_quantity > variant.stock) {
+                _quantity = variant.stock;
+              }
             }
 
             final int currentDisplayedStock = (variant.stock > 0)
@@ -128,65 +123,11 @@ class _VariantScreenState extends State<VariantScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  SizedBox(
-                    height: 280,
-                    child: Stack(
-                      children: [
-                        PageView.builder(
-                          controller: _pageController,
-                          itemCount: images.length,
-                          itemBuilder: (context, index) {
-                            return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(color: Colors.grey.shade100),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
-                                child: Image.network(
-                                  _fixImageUrl(images[index]),
-                                  fit: BoxFit.contain,
-                                  loadingBuilder: (context, child, progress) {
-                                    if (progress == null) return child;
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(
-                                        Icons.broken_image,
-                                        size: 80,
-                                        color: Colors.grey,
-                                      ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        if (images.length > 1)
-                          Positioned.fill(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _navButton(Icons.arrow_back_ios_new, () {
-                                  _pageController.previousPage(
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeInOut,
-                                  );
-                                }),
-                                _navButton(Icons.arrow_forward_ios, () {
-                                  _pageController.nextPage(
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeInOut,
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
+                  // Galería de Imágenes (Widget separado)
+                  ProductImageGallery(
+                    images: variant.images,
+                    pageController: _pageController,
+                    fixUrl: _fixImageUrl,
                   ),
 
                   const SizedBox(height: 20),
@@ -200,75 +141,17 @@ class _VariantScreenState extends State<VariantScreen> {
                   ),
                   const SizedBox(height: 15),
 
-                  const Text(
-                    "Color",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 12,
-                    children: data.variants.map((vOption) {
-                      final colorFeature = vOption.features.firstWhere(
-                        (f) => f.type == 'color',
-                        orElse: () => Feature(
-                          id: 0,
-                          option: '',
-                          type: '',
-                          value: '#cccccc',
-                          description: '',
-                        ),
-                      );
-
-                      final isSelected = vOption.id == variant.id;
-                      final colorHex = colorFeature.value.replaceAll(
-                        '#',
-                        '0xff',
-                      );
-                      final colorInt = int.tryParse(colorHex);
-
-                      return GestureDetector(
-                        onTap: () {
-                          controller.changeVariant(vOption.id);
-                          setState(() => _quantity = 1);
-                        },
-                        child: Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: colorInt != null
-                                ? Color(colorInt)
-                                : Colors.grey,
-                            border: Border.all(
-                              color: isSelected
-                                  ? _primaryColor
-                                  : Colors.black12,
-                              width: isSelected ? 3 : 1,
-                            ),
-                            // CORRECCIÓN: withValues en lugar de withOpacity
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: _primaryColor.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      blurRadius: 8,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: isSelected
-                              ? Icon(
-                                  Icons.check,
-                                  size: 20,
-                                  color: (colorInt == 0xffffffff)
-                                      ? Colors.black
-                                      : Colors.white,
-                                )
-                              : null,
-                        ),
-                      );
-                    }).toList(),
+                  // Selector de Color (Widget separado)
+                  ColorSelector(
+                    variants: data.variants,
+                    selectedId: variant.id,
+                    primaryColor: _primaryColor,
+                    onVariantSelected: (id) {
+                      controller.changeVariant(id);
+                      setState(() {
+                        _quantity = 1;
+                      });
+                    },
                   ),
 
                   const SizedBox(height: 25),
@@ -299,73 +182,30 @@ class _VariantScreenState extends State<VariantScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
+
+                  // Selector de Cantidad y Botón (Widget separado)
+                  QuantitySelector(
+                    quantity: _quantity,
+                    stock: variant.stock,
+                    primaryColor: _primaryColor,
+                    onIncrement: () {
+                      if (_quantity < variant.stock) {
+                        setState(() => _quantity++);
+                      }
+                    },
+                    onDecrement: () {
+                      if (_quantity > 1) {
+                        setState(() => _quantity--);
+                      }
+                    },
+                    onAddToCart: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Agregado $_quantity de ${data.name}"),
+                          backgroundColor: Colors.green,
                         ),
-                        child: Row(
-                          children: [
-                            _qtyBtn(
-                              Icons.remove,
-                              variant.stock > 0 ? _decrementQuantity : null,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 15,
-                              ),
-                              child: Text(
-                                "$_quantity",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            _qtyBtn(
-                              Icons.add,
-                              variant.stock > 0
-                                  ? () => _incrementQuantity(variant.stock)
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: SizedBox(
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: variant.stock > 0
-                                ? () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          "Agregado $_quantity de ${data.name}",
-                                        ),
-                                        backgroundColor: Colors.green,
-                                      ),
-                                    );
-                                  }
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              variant.stock > 0
-                                  ? "Agregar al carrito"
-                                  : "Agotado",
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 30),
@@ -389,25 +229,6 @@ class _VariantScreenState extends State<VariantScreen> {
           },
         ),
       ),
-    );
-  }
-
-  Widget _navButton(IconData icon, VoidCallback onTap) {
-    return IconButton(
-      icon: CircleAvatar(
-        // CORRECCIÓN: withValues en lugar de withOpacity
-        backgroundColor: Colors.white.withValues(alpha: 0.8),
-        child: Icon(icon, size: 18, color: Colors.black),
-      ),
-      onPressed: onTap,
-    );
-  }
-
-  Widget _qtyBtn(IconData icon, VoidCallback? onPressed) {
-    return IconButton(
-      icon: Icon(icon, size: 20),
-      onPressed: onPressed,
-      constraints: const BoxConstraints(minWidth: 45, minHeight: 45),
     );
   }
 }
