@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:anttec_movil/app/core/styles/colors.dart';
+import 'package:anttec_movil/app/core/styles/texts.dart';
 
 class BrandListWidget extends StatelessWidget {
   final List<dynamic> brands;
@@ -8,23 +10,34 @@ class BrandListWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 60,
+      height: 50,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: EdgeInsets.zero,
         itemCount: brands.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        // Misma separación que en categorías
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
           final brand = brands[index];
-          return ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+
+          return ChipTheme(
+            data: ChipTheme.of(context).copyWith(
+              showCheckmark: false,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(
+                  10,
+                ), // Radio 10 igual a categorías
               ),
             ),
-            child: Text(brand['name'] ?? 'Sin nombre'),
+            child: ActionChip(
+              label: Text(brand['name'] ?? 'Sin nombre'),
+              onPressed: () {},
+              // --- ESTILOS IGUALES A CATEGORÍAS ---
+              backgroundColor: AppColors.secondaryS,
+              side: const BorderSide(color: Colors.transparent),
+              labelStyle: AppTexts.body2M.copyWith(color: AppColors.darkT),
+              pressElevation: 0,
+            ),
           );
         },
       ),
