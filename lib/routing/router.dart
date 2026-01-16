@@ -34,7 +34,7 @@ GoRouter router() => GoRouter(
       path: Routes.login,
       name: 'login',
       builder: (BuildContext context, GoRouterState state) => LoginScreen(
-        viewModel: LoginViewmodel(authRepository: context.read()),
+        viewModel: LoginViewModel(authRepository: context.read()),
       ),
     ),
 

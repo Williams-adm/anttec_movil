@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/core/styles/texts.dart';
 import 'package:anttec_movil/app/core/styles/titles.dart';
@@ -7,12 +9,9 @@ import 'package:anttec_movil/app/ui/auth/login/widgets/email_input_w.dart';
 import 'package:anttec_movil/app/ui/auth/login/widgets/password_input_w.dart';
 import 'package:anttec_movil/app/ui/shared/widgets/error_dialog_w.dart';
 import 'package:anttec_movil/app/ui/shared/widgets/loader_w.dart';
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatefulWidget {
-  final LoginViewmodel viewModel;
-
+  final LoginViewModel viewModel;
   const LoginScreen({super.key, required this.viewModel});
 
   @override
@@ -25,85 +24,16 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: ListenableBuilder(
-          listenable: widget.viewModel,
-          builder: (context, _) {
-            return LoaderW(
-              isLoading: widget.viewModel.isloading,
-              child: Center(
-                child: CardLoginW(
-                  children: [
-                    Container(
-                      margin: EdgeInsets.only(bottom: 20.0),
-                      alignment: Alignment.center,
-                      child: Text("Iniciar Sesión", style: AppTitles.login),
-                    ),
-                    Form(
-                      //falta agregar validaciones nivel frontend como que sea de tipo email, cantidad de letras, etc
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Correo Electrónico", style: AppTitles.h3),
-                          SizedBox(height: 10.0),
-                          EmailInputW(controller: _emailController),
-                          SizedBox(height: 20.0),
-                          Text("Contraseña", style: AppTitles.h3),
-                          SizedBox(height: 10.0),
-                          PasswordInputW(controller: _passwordController),
-                          Container(
-                            margin: EdgeInsets.all(15.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text("Recuérdame", style: AppTexts.body1),
-                                Checkbox(
-                                  value: widget.viewModel.rememberMe,
-                                  onChanged: widget.viewModel.toggleRememberMe,
-                                ),
-                              ],
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _handleLogin,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primaryP,
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 30.0,
-                                      vertical: 10.0,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15.0),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    "INGRESAR",
-                                    style: AppTitles.h1.copyWith(
-                                      color: AppColors.primaryS,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    // Escuchar cambios en el ViewModel (errores, estados de carga)
+    widget.viewModel.addListener(_viewModelListener);
+
+    // LOGICA DE "RECUÉRDAME":
+    // Si al iniciar la pantalla el ViewModel ya recuperó un correo, lo ponemos.
+    if (widget.viewModel.savedEmail.isNotEmpty) {
+      _emailController.text = widget.viewModel.savedEmail;
+    }
   }
 
   @override
@@ -114,29 +44,159 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    widget.viewModel.addListener(_viewModelListener);
-  }
-
-  void _handleLogin() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
-
-      final success = await widget.viewModel.login(email, password);
-
-      if (success && mounted) {
-        context.goNamed('home');
-      }
-    }
-  }
-
   void _viewModelListener() {
-    final errorMessage = widget.viewModel.errorMessage;
-    if (errorMessage != null) {
-      ErrorDialogW.show(context, errorMessage);
+    // 1. Manejo de errores
+    if (widget.viewModel.errorMessage != null && mounted) {
+      ErrorDialogW.show(context, widget.viewModel.errorMessage!);
+      widget.viewModel.clearErrorMessage();
     }
+
+    // 2. Actualización tardía del email (si la carga fue asíncrona)
+    if (widget.viewModel.savedEmail.isNotEmpty &&
+        _emailController.text.isEmpty &&
+        mounted) {
+      _emailController.text = widget.viewModel.savedEmail;
+    }
+  }
+
+  Future<void> _handleLogin() async {
+    // Validación del formulario (Frontend)
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    // Ocultar teclado para mejor experiencia visual
+    FocusScope.of(context).unfocus();
+
+    final success = await widget.viewModel.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (success && mounted) {
+      context.goNamed('home');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: LoaderW(
+        isLoading: widget.viewModel.isLoading,
+        child: SafeArea(
+          child: ListenableBuilder(
+            listenable: widget.viewModel,
+            builder: (context, _) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 60),
+                    // Icono de la marca
+                    const Icon(
+                      Icons.lock_person_rounded,
+                      size: 80,
+                      color: AppColors.primaryP,
+                    ),
+                    const SizedBox(height: 20),
+                    Text("¡Bienvenido!", style: AppTitles.login),
+                    Text(
+                      "Ingresa tus credenciales para continuar",
+                      style: AppTexts.body1.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 40),
+
+                    CardLoginW(
+                      children: [
+                        Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildInputLabel("Correo Electrónico"),
+                              EmailInputW(controller: _emailController),
+                              const SizedBox(height: 20),
+                              _buildInputLabel("Contraseña"),
+                              PasswordInputW(controller: _passwordController),
+                              const SizedBox(height: 10),
+                              _buildRememberMe(),
+                              const SizedBox(height: 30),
+                              _buildSubmitButton(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Widgets Auxiliares Privados ---
+
+  Widget _buildInputLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(label, style: AppTitles.h3),
+    );
+  }
+
+  Widget _buildRememberMe() {
+    return InkWell(
+      onTap: () =>
+          widget.viewModel.toggleRememberMe(!widget.viewModel.rememberMe),
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Checkbox(
+            value: widget.viewModel.rememberMe,
+            // CORRECCIÓN: 'val!' asegura que no sea nulo, eliminando el error del linter
+            onChanged: (val) => widget.viewModel.toggleRememberMe(val!),
+            activeColor: AppColors.primaryP,
+          ),
+          Text("Recuérdame", style: AppTexts.body1),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    final bool isBusy = widget.viewModel.isLoading;
+
+    return ElevatedButton(
+      // Deshabilitamos el botón si está cargando
+      onPressed: isBusy ? null : _handleLogin,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primaryP,
+        // CORRECCIÓN: Usamos .withValues() (el nuevo estándar) en lugar de .withOpacity()
+        disabledBackgroundColor: AppColors.primaryP.withValues(alpha: 0.6),
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        elevation: 2,
+      ),
+      child: isBusy
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+          : Text(
+              "INGRESAR",
+              style: AppTitles.h1.copyWith(
+                color: Colors.white,
+                letterSpacing: 1.2,
+              ),
+            ),
+    );
   }
 }

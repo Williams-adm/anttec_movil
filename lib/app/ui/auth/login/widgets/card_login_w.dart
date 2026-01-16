@@ -9,18 +9,21 @@ class CardLoginW extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      // shape: RoundedRectangleBorder ya maneja borderSide none por defecto
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.0),
-        side: BorderSide(color: Colors.transparent),
+        borderRadius: BorderRadius.circular(
+          24.0,
+        ), // Un poco más redondeado (moderno)
       ),
       color: AppColors.primaryS,
-      margin: EdgeInsets.only(left: 25.0, right: 25.0),
-      elevation: 8.0,
+      margin: const EdgeInsets.symmetric(horizontal: 24.0), // Más responsivo
+      elevation: 10.0,
+      shadowColor: Colors.black.withValues(alpha: 0.1), // Sombra más suave
       child: Padding(
-        padding: EdgeInsetsGeometry.symmetric(vertical: 35.0, horizontal: 25.0),
+        padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch, // Alineación completa
           children: children,
         ),
       ),
