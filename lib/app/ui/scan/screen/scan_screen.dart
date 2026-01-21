@@ -3,6 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:anttec_movil/app/core/styles/texts.dart';
 
+// ✅ Importaciones de tus servicios
+import 'package:anttec_movil/data/services/api/v1/api_service.dart';
+// Asegúrate de que esta ruta coincida con donde guardaste el archivo de arriba
+import 'package:anttec_movil/data/services/api/v1/scaner_service.dart';
+
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -14,6 +19,50 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _isProcessing = false;
   final MobileScannerController cameraController = MobileScannerController();
 
+  late final ScannerService _scannerService;
+
+  @override
+  void initState() {
+    super.initState();
+    // 💉 Inyección de dependencias manual:
+    // Creamos el ApiService y se lo pasamos al ScannerService.
+    _scannerService = ScannerService(apiService: ApiService());
+  }
+
+  Future<void> _processBarcode(String barcode) async {
+    setState(() => _isProcessing = true);
+
+    try {
+      // 1. Consulta limpia al servicio
+      final productData = await _scannerService.getVariantByBarcode(barcode);
+
+      if (mounted) {
+        // 2. Navegación enviando la DATA completa (ahorras una petición en la sig. pantalla)
+        context.push('/producto/$barcode', extra: productData);
+      }
+    } catch (e) {
+      // Limpieza del mensaje de error para la UI
+      final message = e.toString().replaceAll('Exception: ', '');
+      _showError(message);
+    } finally {
+      // Pequeña pausa para UX
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _onDetect(BarcodeCapture capture) {
     if (_isProcessing) return;
 
@@ -21,16 +70,7 @@ class _ScanScreenState extends State<ScanScreen> {
     if (barcodes.isNotEmpty) {
       final String? code = barcodes.first.rawValue;
       if (code != null && code.isNotEmpty) {
-        setState(() => _isProcessing = true);
-
-        // 🔗 Redirige al detalle del producto
-        // Ejemplo: /producto/12345
-        context.push('/producto/$code');
-
-        // Pequeño retraso para evitar lecturas múltiples
-        Future.delayed(const Duration(seconds: 2), () {
-          setState(() => _isProcessing = false);
-        });
+        _processBarcode(code);
       }
     }
   }
@@ -55,11 +95,22 @@ class _ScanScreenState extends State<ScanScreen> {
                   controller: cameraController,
                   onDetect: _onDetect,
                 ),
+                // Overlay de carga
                 if (_isProcessing)
                   Container(
                     color: Colors.black54,
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(color: Colors.white),
+                          const SizedBox(height: 10),
+                          Text(
+                            "Consultando...",
+                            style: AppTexts.body2.copyWith(color: Colors.white),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
               ],
@@ -77,15 +128,11 @@ class _ScanScreenState extends State<ScanScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.cameraswitch),
-              onPressed: () {
-                cameraController.switchCamera();
-              },
+              onPressed: () => cameraController.switchCamera(),
             ),
             IconButton(
               icon: const Icon(Icons.flash_on),
-              onPressed: () {
-                cameraController.toggleTorch();
-              },
+              onPressed: () => cameraController.toggleTorch(),
             ),
           ],
         ),
