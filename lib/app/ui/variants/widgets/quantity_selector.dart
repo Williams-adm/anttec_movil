@@ -20,56 +20,88 @@ class QuantitySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
+    final bool isOutOfStock = stock <= 0;
+
+    // Usamos IntrinsicHeight para que los botones y el texto tengan la misma altura
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          // --- CONTADOR [- 1 +] ---
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildCounterBtn(Icons.remove, onDecrement, quantity > 1),
+                Container(
+                  width: 40,
+                  alignment: Alignment.center,
+                  child: Text(
+                    "$quantity",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                _buildCounterBtn(Icons.add, onIncrement, quantity < stock),
+              ],
+            ),
           ),
-          child: Row(
-            children: [
-              _btn(Icons.remove, stock > 0 ? onDecrement : null),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
+
+          const SizedBox(width: 15),
+
+          // --- BOTÓN AGREGAR (EXPANDED) ---
+          // Este Expanded es el que causaba error.
+          // Para que funcione, el PADRE en VariantScreen también debe usar Expanded.
+          Expanded(
+            child: SizedBox(
+              height: 45, // Altura fija para el botón
+              child: ElevatedButton(
+                onPressed: isOutOfStock ? null : onAddToCart,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  disabledBackgroundColor: Colors.grey[300],
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 child: Text(
-                  "$quantity",
-                  style: const TextStyle(
-                    fontSize: 18,
+                  isOutOfStock ? "Agotado" : "Agregar",
+                  style: TextStyle(
+                    color: isOutOfStock ? Colors.grey : Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
               ),
-              _btn(Icons.add, stock > 0 ? onIncrement : null),
-            ],
-          ),
-        ),
-        const SizedBox(width: 15),
-        Expanded(
-          child: SizedBox(
-            height: 50,
-            child: ElevatedButton(
-              onPressed: stock > 0 ? onAddToCart : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(stock > 0 ? "Agregar al carrito" : "Agotado"),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _btn(IconData icon, VoidCallback? onPressed) {
-    return IconButton(
-      icon: Icon(icon, size: 20),
-      onPressed: onPressed,
-      constraints: const BoxConstraints(minWidth: 45, minHeight: 45),
+  Widget _buildCounterBtn(IconData icon, VoidCallback onTap, bool enabled) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Icon(
+            icon,
+            size: 20,
+            color: enabled ? Colors.black87 : Colors.grey[400],
+          ),
+        ),
+      ),
     );
   }
 }

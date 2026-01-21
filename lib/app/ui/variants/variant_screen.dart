@@ -24,14 +24,15 @@ class VariantScreen extends StatefulWidget {
 class _VariantScreenState extends State<VariantScreen> {
   int _quantity = 1;
   final PageController _pageController = PageController();
+
+  // Color principal (Morado Anttec)
   final Color _primaryColor = const Color(0xFF7E33A3);
 
   String _fixImageUrl(String? url) {
-    // ✅ Corrección 1: Agregadas llaves {}
     if (url == null || url.isEmpty) {
       return 'https://via.placeholder.com/300';
     }
-
+    // Ajuste para emuladores/local
     if (url.contains('192.168.1.4') ||
         url.contains('localhost') ||
         url.contains('anttec-back.test')) {
@@ -54,10 +55,12 @@ class _VariantScreenState extends State<VariantScreen> {
         backgroundColor: Colors.white,
         body: Consumer<VariantController>(
           builder: (context, controller, _) {
-            // ✅ Corrección 2: Agregadas llaves {} a los estados de carga
+            // --- 1. ESTADOS DE CARGA ---
             if (controller.loading) {
               return const Center(child: CircularProgressIndicator());
             }
+
+            // --- 2. MANEJO DE ERRORES ---
             if (controller.error != null) {
               return _buildErrorState(context, controller.error!);
             }
@@ -65,10 +68,18 @@ class _VariantScreenState extends State<VariantScreen> {
               return _buildErrorState(context, "Producto no encontrado");
             }
 
-            // Datos listos
+            // --- 3. DATOS ---
             final data = controller.product!;
             final variant = data.selectedVariant;
 
+            // ✅ CORRECCIÓN 1: Eliminamos los '??' porque tus datos ya son no-nulos
+            final String brandName = data.brand.toUpperCase();
+            final String productName = data.name;
+            final String sku = variant.sku;
+            final String description = data.description;
+            final double price = variant.price;
+
+            // Lógica stock
             _updateQuantityLogic(variant);
 
             final int currentDisplayedStock = (variant.stock > 0)
@@ -78,79 +89,156 @@ class _VariantScreenState extends State<VariantScreen> {
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                // --- BARRA SUPERIOR ---
+                // --- HEADER: IMAGEN GRANDE ---
                 SliverAppBar(
+                  expandedHeight: 400,
                   backgroundColor: Colors.white,
                   elevation: 0,
-                  pinned: false,
-                  floating: true,
-                  snap: true,
-                  centerTitle: false,
+                  pinned: true,
+                  floating: false,
                   systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
                     statusBarColor: Colors.transparent,
                   ),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  title: const Text(
-                    "Detalle del producto",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.black,
-                        size: 28,
+                  leading: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CircleAvatar(
+                      // ✅ CORRECCIÓN 2: Uso de withValues en lugar de withOpacity
+                      backgroundColor: Colors.white.withValues(alpha: 0.9),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.black87,
+                        ),
+                        onPressed: () => Navigator.pop(context),
                       ),
-                      onPressed: () => Navigator.pop(context),
                     ),
-                  ],
+                  ),
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: ProductImageGallery(
+                      images: variant.images, // Eliminado el '?? []'
+                      pageController: _pageController,
+                      fixUrl: _fixImageUrl,
+                    ),
+                  ),
                 ),
 
-                // --- CONTENIDO ---
+                // --- CONTENIDO: PANEL DESLIZANTE ---
                 SliverToBoxAdapter(
-                  child: Padding(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 10,
+                          offset: Offset(0, -5),
+                        ),
+                      ],
+                    ),
+                    transform: Matrix4.translationValues(0.0, -20.0, 0.0),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
+                      horizontal: 24,
+                      vertical: 30,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // A. MARCA Y SKU
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                // ✅ CORRECCIÓN 2: Uso de withValues
+                                color: _primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                brandName.isEmpty ? "ANTTEC" : brandName,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _primaryColor,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              "SKU: $sku",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // B. TÍTULO
                         Text(
-                          "${data.brand.toUpperCase()} - ${data.name}",
+                          productName,
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                             height: 1.2,
+                            letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(height: 20),
 
-                        ProductImageGallery(
-                          images: variant.images,
-                          pageController: _pageController,
-                          fixUrl: _fixImageUrl,
-                        ),
-
-                        const SizedBox(height: 20),
-                        Text(
-                          "SKU: ${variant.sku}",
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
                         const SizedBox(height: 15),
 
-                        // Selector de Color alineado
+                        // C. PRECIO Y STOCK
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: "S/. ",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: _primaryColor,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: price.toStringAsFixed(2),
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w800,
+                                      color: _primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              "$currentDisplayedStock disponibles",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: currentDisplayedStock < 5
+                                    ? Colors.red
+                                    : Colors.green,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 25),
+                        const Divider(height: 1),
+                        const SizedBox(height: 25),
+
+                        // D. SELECCIÓN DE COLOR
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -158,10 +246,11 @@ class _VariantScreenState extends State<VariantScreen> {
                               "Color:",
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
                               ),
                             ),
-                            const SizedBox(width: 15),
+                            const SizedBox(width: 20),
                             Expanded(
                               child: ColorSelector(
                                 variants: data.variants,
@@ -180,66 +269,52 @@ class _VariantScreenState extends State<VariantScreen> {
 
                         const SizedBox(height: 25),
 
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        // E. CANTIDAD Y BOTÓN AGREGAR
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "Stock: $currentDisplayedStock",
-                              style: const TextStyle(
+                            const Text(
+                              "Cantidad",
+                              style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
                               ),
                             ),
-                            Text(
-                              "S/. ${variant.price.toStringAsFixed(2)}",
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: _primaryColor,
-                              ),
+                            const SizedBox(height: 12),
+
+                            QuantitySelector(
+                              quantity: _quantity,
+                              stock: variant.stock,
+                              primaryColor: _primaryColor,
+                              onIncrement: () {
+                                if (_quantity < variant.stock) {
+                                  setState(() => _quantity++);
+                                }
+                              },
+                              onDecrement: () {
+                                if (_quantity > 1) {
+                                  setState(() => _quantity--);
+                                }
+                              },
+                              onAddToCart: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Agregado $_quantity de $productName",
+                                    ),
+                                    backgroundColor: Colors.green,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
 
-                        const SizedBox(height: 25),
-                        const Text(
-                          "Cantidad",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        QuantitySelector(
-                          quantity: _quantity,
-                          stock: variant.stock,
-                          primaryColor: _primaryColor,
-                          onIncrement: () {
-                            // ✅ Corrección 3: Agregadas llaves {}
-                            if (_quantity < variant.stock) {
-                              setState(() => _quantity++);
-                            }
-                          },
-                          onDecrement: () {
-                            // ✅ Corrección 4: Agregadas llaves {}
-                            if (_quantity > 1) {
-                              setState(() => _quantity--);
-                            }
-                          },
-                          onAddToCart: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  "Agregado $_quantity de ${data.name}",
-                                ),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          },
-                        ),
-
                         const SizedBox(height: 30),
+
+                        // F. DESCRIPCIÓN
                         const Text(
                           "Descripción",
                           style: TextStyle(
@@ -247,13 +322,13 @@ class _VariantScreenState extends State<VariantScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Text(
-                          data.description,
-                          style: const TextStyle(
+                          description,
+                          style: TextStyle(
                             fontSize: 15,
-                            color: Colors.black87,
-                            height: 1.5,
+                            color: Colors.grey[700],
+                            height: 1.6,
                           ),
                         ),
                         const SizedBox(height: 50),
@@ -269,30 +344,40 @@ class _VariantScreenState extends State<VariantScreen> {
     );
   }
 
+  // --- Helpers ---
+
   Widget _buildErrorState(BuildContext context, String message) {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () => Navigator.pop(context),
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
         ),
-        SliverFillRemaining(child: Center(child: Text(message))),
-      ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 60, color: Colors.grey),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   void _updateQuantityLogic(dynamic variant) {
     if (variant.stock <= 0) {
-      // ✅ Corrección 5: Agregadas llaves {}
       if (_quantity != 0) {
         _quantity = 0;
       }
     } else {
-      // ✅ Corrección 6: Agregadas llaves {}
       if (_quantity == 0) {
         _quantity = 1;
       }

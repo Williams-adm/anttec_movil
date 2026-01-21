@@ -17,65 +17,90 @@ class ColorSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 🛠️ DEBUG: Mira tu consola para ver si llegan datos
+    debugPrint("ColorSelector recibió: ${variants.length} variantes");
+
+    if (variants.isEmpty) {
+      return const Text("Sin opciones", style: TextStyle(color: Colors.grey));
+    }
+
     return Wrap(
       spacing: 12,
       runSpacing: 10,
       children: variants.map((v) {
         final isSelected = v.id == selectedId;
 
-        // Buscamos la característica de tipo 'color'
+        // 1. Búsqueda insensible a mayúsculas ('Color' == 'color')
         final colorFeat = v.features.firstWhere(
-          (f) => f.type == 'color',
+          (f) => f.type.toLowerCase() == 'color',
           orElse: () => Feature(
             id: 0,
-            option: '',
-            type: '',
-            value: '#cccccc',
+            option: 'Unknown',
+            type: 'color',
+            value: '#CCCCCC', // Color por defecto (Gris)
             description: '',
           ),
         );
 
-        // Lógica de conversión de Hex a Int
-        String hexString = colorFeat.value.replaceAll('#', '');
-
-        // ✅ CORRECCIÓN: Agregamos las llaves { } al bloque if
-        if (hexString.length == 6) {
-          hexString = "ff$hexString";
+        // 2. Limpieza robusta del Hexadecimal
+        Color circleColor;
+        try {
+          String hex = colorFeat.value.replaceAll('#', '').trim();
+          if (hex.length == 6) {
+            hex = "FF$hex"; // Agregar opacidad 100% si falta
+          }
+          circleColor = Color(int.parse("0x$hex"));
+        } catch (e) {
+          debugPrint("Error parseando color '${colorFeat.value}': $e");
+          circleColor = Colors.grey.shade300; // Color de error visual
         }
 
-        final colorInt = int.tryParse("0x$hexString");
+        // Detectar si es un color claro para ponerle borde oscuro
+        final isLightColor = circleColor.computeLuminance() > 0.8;
 
         return GestureDetector(
           onTap: () => onVariantSelected(v.id),
-          child: Container(
-            width: 38,
-            height: 38,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            width: isSelected ? 42 : 36,
+            height: isSelected ? 42 : 36,
+            padding: const EdgeInsets.all(
+              2,
+            ), // Margen para el borde de selección
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: colorInt != null ? Color(colorInt) : Colors.grey,
               border: Border.all(
-                color: isSelected ? primaryColor : Colors.black12,
-                width: isSelected ? 3 : 1,
+                color: isSelected ? primaryColor : Colors.transparent,
+                width: 2,
               ),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: circleColor,
+                border: Border.all(
+                  color: Colors.black12, // Borde sutil para todos
+                  width: 1,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: isSelected
+                  ? Icon(
+                      Icons.check,
+                      size: 20,
+                      color: isLightColor ? Colors.black87 : Colors.white,
+                    )
                   : null,
             ),
-            child: isSelected
-                ? Icon(
-                    Icons.check,
-                    size: 20,
-                    color: (hexString.toLowerCase().endsWith('ffffff'))
-                        ? Colors.black
-                        : Colors.white,
-                  )
-                : null,
           ),
         );
       }).toList(),
