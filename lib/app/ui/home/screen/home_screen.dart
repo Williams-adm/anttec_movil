@@ -1,4 +1,3 @@
-// home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:anttec_movil/app/ui/product/screen/products_screen.dart';
@@ -13,6 +12,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _secureStorage = const FlutterSecureStorage();
   String? _token;
+  bool _loading = true; // Variable para controlar el estado de carga
 
   @override
   void initState() {
@@ -21,24 +21,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadToken() async {
-    final token = await _secureStorage.read(key: 'auth_token');
-    setState(() {
-      _token = token;
-    });
+    try {
+      final token = await _secureStorage.read(key: 'auth_token');
+      if (mounted) {
+        setState(() {
+          _token = token;
+          _loading = false; // Terminó de cargar
+        });
+      }
+    } catch (e) {
+      // Si hay error, dejamos de cargar para mostrar el mensaje
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_token == null) {
+    // 1. Estado de Carga
+    if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (_token!.isEmpty) {
+
+    // 2. Estado de Error (No hay token)
+    if (_token == null || _token!.isEmpty) {
       return const Scaffold(
-        body: Center(child: Text('Error: No se encontró token')),
+        body: Center(child: Text('Error: No se encontró token de sesión')),
       );
     }
 
-    // SOLO mostramos ProductsScreen
+    // 3. Estado de Éxito
     return Scaffold(body: ProductsScreen(token: _token!));
   }
 }

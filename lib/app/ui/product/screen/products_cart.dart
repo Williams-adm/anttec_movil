@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:anttec_movil/data/services/api/v1/model/product/product_response.dart';
-import 'package:anttec_movil/app/ui/variants/variant_screen.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -46,31 +46,39 @@ class ProductCard extends StatelessWidget {
               child: InkWell(
                 onTap: () {
                   if (product.defaultVariantId == null) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => VariantScreen(
-                        productId: product.id,
-                        initialVariantId: product.defaultVariantId!,
-                      ),
-                    ),
+
+                  // Datos para el Router
+                  final Map<String, dynamic> productData = {
+                    'id': product.id,
+                    'selected_variant': {'id': product.defaultVariantId},
+                  };
+
+                  context.pushNamed(
+                    'product_detail',
+                    pathParameters: {'sku': product.id.toString()},
+                    extra: productData,
                   );
                 },
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      // IMAGEN (Sin filtro gris)
+                      // IMAGEN
                       Expanded(
                         child: Image.network(
                           imageUrl,
                           fit: BoxFit.contain,
                           width: double.infinity,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                              ),
                         ),
                       ),
                       const SizedBox(height: 12),
 
-                      // MARCA
+                      // MARCA (Corregido: sin ??)
                       Text(
                         product.brand.toUpperCase(),
                         style: const TextStyle(
@@ -82,7 +90,7 @@ class ProductCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
 
-                      // NOMBRE DEL PRODUCTO
+                      // NOMBRE
                       Text(
                         product.name,
                         maxLines: 2,
@@ -95,14 +103,14 @@ class ProductCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
 
-                      // PRECIO O ESTADO AGOTADO
+                      // PRECIO
                       if (isOutOfStock)
                         const Text(
                           "AGOTADO",
                           style: TextStyle(
                             color: Colors.red,
                             fontWeight: FontWeight.w900,
-                            fontSize: 14, // Un poco más grande para que resalte
+                            fontSize: 14,
                           ),
                         )
                       else
