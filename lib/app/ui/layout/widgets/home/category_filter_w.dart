@@ -1,17 +1,18 @@
+import 'package:flutter/material.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/core/styles/texts.dart';
-import 'package:anttec_movil/app/ui/brand/widgets/brand_list_widget.dart'; // Tu widget de lista de marcas
 import 'package:anttec_movil/data/services/api/v1/model/category/category_model.dart';
-import 'package:flutter/material.dart';
 
 class CategoryFilterW extends StatefulWidget {
   final List<CategoryModel> categories;
-  final List<dynamic> brands; // Recibimos las marcas aquí
+  final List<dynamic> brands;
+  final Function(int? categoryId, int? brandId) onFilterChanged;
 
   const CategoryFilterW({
     super.key,
     required this.categories,
     required this.brands,
+    required this.onFilterChanged,
   });
 
   @override
@@ -19,7 +20,8 @@ class CategoryFilterW extends StatefulWidget {
 }
 
 class _CategoryFilterWState extends State<CategoryFilterW> {
-  int? _selectedIndex;
+  int? _selectedCategoryId;
+  int? _selectedBrandId;
 
   @override
   Widget build(BuildContext context) {
@@ -27,63 +29,115 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // --- 1. LISTA HORIZONTAL DE CATEGORÍAS (CHIPS) ---
+        // ============================================================
+        // 1. LISTA DE CATEGORÍAS
+        // ============================================================
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          // Un poco de padding abajo para separar de las marcas
           padding: const EdgeInsets.only(bottom: 15.0),
           child: Row(
-            children: [
-              for (int i = 0; i < widget.categories.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(right: 14.0),
-                  child: ChipTheme(
-                    data: ChipTheme.of(context).copyWith(
-                      showCheckmark: false,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: ChoiceChip(
-                      label: Text(widget.categories[i].name),
-                      selected: _selectedIndex == i,
-                      onSelected: (bool selected) {
-                        setState(() {
-                          // Si tocas el que ya está seleccionado, se desmarca (null).
-                          // Si tocas uno nuevo, se marca ese índice (i).
-                          _selectedIndex = selected ? i : null;
-                        });
-                      },
-                      selectedColor: AppColors.secondaryP,
-                      backgroundColor: AppColors.secondaryS,
-                      side: const BorderSide(color: Colors.transparent),
-                      labelStyle: AppTexts.body2M.copyWith(
-                        color: _selectedIndex == i
-                            ? AppColors.primaryS
-                            : AppColors.darkT,
-                      ),
-                    ),
+            children: widget.categories.map((category) {
+              final isSelected = _selectedCategoryId == category.id;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 14.0),
+                child: ChoiceChip(
+                  label: Text(category.name),
+                  selected: isSelected,
+                  showCheckmark: false,
+                  selectedColor: AppColors.secondaryP,
+                  backgroundColor: AppColors.secondaryS,
+                  side: const BorderSide(color: Colors.transparent),
+                  labelStyle: AppTexts.body2M.copyWith(
+                    color: isSelected ? AppColors.primaryS : AppColors.darkT,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      // Si seleccionamos una nueva o deseleccionamos:
+                      _selectedCategoryId = selected ? category.id : null;
+
+                      // 🔥 IMPORTANTE: Si cambiamos de categoría, reiniciamos la marca
+                      // para evitar que se quede filtrando una marca oculta.
+                      _selectedBrandId = null;
+                    });
+
+                    widget.onFilterChanged(
+                      _selectedCategoryId,
+                      _selectedBrandId,
+                    );
+                  },
                 ),
-            ],
+              );
+            }).toList(),
           ),
         ),
 
-        // --- 2. LISTA DE MARCAS (Se muestra solo si hay selección) ---
-        if (_selectedIndex != null) ...[
+        // ============================================================
+        // 2. LISTA DE MARCAS (SOLO SI HAY CATEGORÍA SELECCIONADA)
+        // ============================================================
+        // 🔥 AQUÍ ESTÁ EL CAMBIO QUE PEDISTE:
+        // Agregamos "_selectedCategoryId != null" a la condición
+        if (_selectedCategoryId != null && widget.brands.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
             child: Text(
-              "Marcas disponibles:", // Opcional: Título pequeño
+              "Filtrar por Marca:",
               style: AppTexts.body2M.copyWith(color: Colors.grey, fontSize: 12),
             ),
           ),
 
-          // Aquí reutilizamos tu widget que ya tiene el ListView horizontal y botones
-          BrandListWidget(brands: widget.brands),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 15.0),
+            child: Row(
+              children: widget.brands.map((brand) {
+                // Validación para Mapas o Objetos (Mantiene tu corrección anterior)
+                final dynamic rawId = (brand is Map) ? brand['id'] : brand.id;
+                final dynamic rawName = (brand is Map)
+                    ? brand['name']
+                    : brand.name;
 
-          // Un espacio extra al final para que no pegue con lo siguiente
-          const SizedBox(height: 10),
+                final int brandId = int.tryParse(rawId.toString()) ?? 0;
+                final String brandName = rawName?.toString() ?? "Marca";
+
+                final isSelected = _selectedBrandId == brandId;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10.0),
+                  child: ChoiceChip(
+                    label: Text(brandName),
+                    selected: isSelected,
+                    showCheckmark: false,
+                    selectedColor: const Color(0xFFE0E0E0),
+                    backgroundColor: Colors.white,
+                    side: BorderSide(
+                      color: isSelected
+                          ? Colors.transparent
+                          : Colors.grey.shade300,
+                    ),
+                    labelStyle: AppTexts.body2M.copyWith(
+                      color: isSelected ? Colors.black : Colors.grey,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    onSelected: (bool selected) {
+                      setState(() {
+                        _selectedBrandId = selected ? brandId : null;
+                      });
+                      widget.onFilterChanged(
+                        _selectedCategoryId,
+                        _selectedBrandId,
+                      );
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ],
     );

@@ -22,7 +22,7 @@ class ProductsScreen extends StatefulWidget {
 }
 
 class _ProductsScreenState extends State<ProductsScreen> {
-  // Controlador para el scroll infinito (se pasa al GridView)
+  // Controlador para el scroll infinito
   final ScrollController _scrollController = ScrollController();
   // Controlador para el buscador
   final TextEditingController _searchController = TextEditingController();
@@ -36,26 +36,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos los datos del Layout (Perfil, Categorías, Marcas) que vienen del padre
+    // Obtenemos los datos del Layout (Perfil, Categorías, Marcas)
     final layoutModel = context.watch<LayoutHomeViewmodel>();
 
     return ChangeNotifierProvider(
       create: (_) => ProductsController(token: widget.token),
       child: Consumer<ProductsController>(
         builder: (context, controller, _) {
-          // USAMOS NotificationListener: Es la forma limpia de detectar el scroll
-          // sin necesidad de agregar listeners manuales ni pelear con el contexto.
           return NotificationListener<ScrollNotification>(
             onNotification: (ScrollNotification scrollInfo) {
-              // Si estamos haciendo scroll y llegamos al final (menos 200 pixeles)
+              // Lógica de Scroll Infinito
               if (scrollInfo.metrics.pixels >=
                       scrollInfo.metrics.maxScrollExtent - 200 &&
                   !controller.loading &&
                   controller.page < controller.lastPage) {
-                // Pedimos la siguiente página
                 controller.nextPage();
               }
-              return false; // Dejamos que el scroll siga funcionando normal
+              return false;
             },
             child: Column(
               children: [
@@ -67,7 +64,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Column(
                     children: [
-                      // Header (Perfil + Logout)
+                      // Header
                       HeaderHomeW(
                         profileName: layoutModel.profileName ?? '',
                         logout: () async {
@@ -84,14 +81,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         child: SearchW(controller: _searchController),
                       ),
 
-                      // Filtro de Categorías y Marcas
+                      // 🔥 Filtro de Categorías y Marcas 🔥
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: CategoryFilterW(
                           categories: layoutModel.categories,
-                          // --- AQUÍ ESTABA EL ERROR ---
-                          // Agregamos las marcas que vienen del layoutModel
                           brands: layoutModel.brands,
+
+                          // ✅ AQUÍ ESTABA EL ERROR: Faltaba esta función
+                          onFilterChanged: (int? categoryId, int? brandId) {
+                            // Llamamos al controlador para aplicar los filtros
+                            controller.applyFilters(
+                              category: categoryId,
+                              brand: brandId,
+                            );
+                          },
                         ),
                       ),
 
