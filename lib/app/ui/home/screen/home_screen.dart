@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:anttec_movil/app/ui/product/screen/products_screen.dart';
+import 'package:anttec_movil/app/ui/chat/screen/chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,7 +13,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _secureStorage = const FlutterSecureStorage();
   String? _token;
-  bool _loading = true; // Variable para controlar el estado de carga
+  bool _loading = true;
 
   @override
   void initState() {
@@ -26,11 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _token = token;
-          _loading = false; // Terminó de cargar
+          _loading = false;
         });
       }
     } catch (e) {
-      // Si hay error, dejamos de cargar para mostrar el mensaje
       if (mounted) {
         setState(() {
           _loading = false;
@@ -41,19 +41,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Estado de Carga
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // 2. Estado de Error (No hay token)
     if (_token == null || _token!.isEmpty) {
       return const Scaffold(
         body: Center(child: Text('Error: No se encontró token de sesión')),
       );
     }
 
-    // 3. Estado de Éxito
-    return Scaffold(body: ProductsScreen(token: _token!));
+    return Scaffold(
+      body: ProductsScreen(token: _token!),
+
+      // ✅ CORREGIDO: 'child' ahora está al final
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ChatScreen()),
+          );
+        },
+        backgroundColor: const Color(0xFF7E33A3),
+        tooltip: 'Asistente IA', // Tooltip va antes que child
+        child: const Icon(Icons.auto_awesome, color: Colors.white),
+      ),
+    );
   }
 }

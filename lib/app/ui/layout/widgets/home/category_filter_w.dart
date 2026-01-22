@@ -29,16 +29,13 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ============================================================
-        // 1. LISTA DE CATEGORÍAS
-        // ============================================================
+        // 1. CATEGORÍAS
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.only(bottom: 15.0),
           child: Row(
             children: widget.categories.map((category) {
               final isSelected = _selectedCategoryId == category.id;
-
               return Padding(
                 padding: const EdgeInsets.only(right: 14.0),
                 child: ChoiceChip(
@@ -56,14 +53,10 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
                   ),
                   onSelected: (bool selected) {
                     setState(() {
-                      // Si seleccionamos una nueva o deseleccionamos:
                       _selectedCategoryId = selected ? category.id : null;
-
-                      // 🔥 IMPORTANTE: Si cambiamos de categoría, reiniciamos la marca
-                      // para evitar que se quede filtrando una marca oculta.
-                      _selectedBrandId = null;
+                      _selectedBrandId =
+                          null; // Reiniciar marca al cambiar categoría
                     });
-
                     widget.onFilterChanged(
                       _selectedCategoryId,
                       _selectedBrandId,
@@ -75,11 +68,7 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
           ),
         ),
 
-        // ============================================================
-        // 2. LISTA DE MARCAS (SOLO SI HAY CATEGORÍA SELECCIONADA)
-        // ============================================================
-        // 🔥 AQUÍ ESTÁ EL CAMBIO QUE PEDISTE:
-        // Agregamos "_selectedCategoryId != null" a la condición
+        // 2. MARCAS (SOLO SI HAY CATEGORÍA)
         if (_selectedCategoryId != null && widget.brands.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
@@ -88,20 +77,19 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
               style: AppTexts.body2M.copyWith(color: Colors.grey, fontSize: 12),
             ),
           ),
-
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.only(bottom: 15.0),
             child: Row(
               children: widget.brands.map((brand) {
-                // Validación para Mapas o Objetos (Mantiene tu corrección anterior)
+                // 🔥 CORRECCIÓN CRÍTICA: Manejo seguro de ID y Nombre
                 final dynamic rawId = (brand is Map) ? brand['id'] : brand.id;
                 final dynamic rawName = (brand is Map)
                     ? brand['name']
                     : brand.name;
 
                 final int brandId = int.tryParse(rawId.toString()) ?? 0;
-                final String brandName = rawName?.toString() ?? "Marca";
+                final String brandName = rawName?.toString() ?? "General";
 
                 final isSelected = _selectedBrandId == brandId;
 
