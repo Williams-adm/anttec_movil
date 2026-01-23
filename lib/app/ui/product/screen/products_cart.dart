@@ -6,10 +6,15 @@ class ProductCard extends StatelessWidget {
   final Product product;
   const ProductCard({super.key, required this.product});
 
+  // Corrección de URLs para que se vean las imágenes en el emulador/celular
   String _fixImageUrl(String? url) {
-    if (url == null || url.isEmpty) return 'https://via.placeholder.com/150';
+    if (url == null || url.isEmpty) {
+      return 'https://via.placeholder.com/150';
+    }
+    // Si la URL viene de localhost o IP local, la cambiamos por la nube o IP accesible
     if (url.contains('anttec-back.test') ||
         url.contains('localhost') ||
+        url.contains('127.0.0.1') ||
         url.contains('10.0.2.2')) {
       return url.replaceAll(
         RegExp(r'http://[^/]+'),
@@ -23,7 +28,7 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = _fixImageUrl(product.imageUrl);
     final isOutOfStock = product.stock <= 0;
-    const accentColor = Color(0xFF7E33A3);
+    const accentColor = Color(0xFF7E33A3); // Morado Anttec
 
     return Container(
       decoration: BoxDecoration(
@@ -44,15 +49,20 @@ class ProductCard extends StatelessWidget {
             Material(
               color: Colors.transparent,
               child: InkWell(
+                // -------------------------------------------------------
+                // 🔥 AQUÍ ESTÁ LA MAGIA DE LA NAVEGACIÓN
+                // -------------------------------------------------------
                 onTap: () {
                   if (product.defaultVariantId == null) return;
 
-                  // Datos para el Router
+                  // Preparamos los datos mínimos para la siguiente pantalla
                   final Map<String, dynamic> productData = {
                     'id': product.id,
                     'selected_variant': {'id': product.defaultVariantId},
                   };
 
+                  // ✅ USAMOS pushNamed (NO 'go')
+                  // Esto apila la pantalla, manteniendo el Home vivo debajo.
                   context.pushNamed(
                     'product_detail',
                     pathParameters: {'sku': product.id.toString()},
@@ -63,54 +73,80 @@ class ProductCard extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      // IMAGEN
+                      // --- 1. IMAGEN DEL PRODUCTO ---
                       Expanded(
                         child: Image.network(
                           imageUrl,
                           fit: BoxFit.contain,
                           width: double.infinity,
+                          // Si la imagen falla, mostramos un icono gris
                           errorBuilder: (context, error, stackTrace) =>
                               const Icon(
-                                Icons.image_not_supported,
-                                color: Colors.grey,
+                            Icons.image_not_supported,
+                            color: Colors.grey,
+                            size: 40,
+                          ),
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes !=
+                                        null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                strokeWidth: 2,
                               ),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 12),
 
-                      // MARCA (Corregido: sin ??)
+                      // --- 2. MARCA ---
                       Text(
                         product.brand.toUpperCase(),
                         style: const TextStyle(
-                          fontSize: 9,
+                          fontSize: 10,
                           fontWeight: FontWeight.w800,
                           color: Colors.grey,
-                          letterSpacing: 1.2,
+                          letterSpacing: 1.0,
                         ),
                       ),
                       const SizedBox(height: 4),
 
-                      // NOMBRE
+                      // --- 3. NOMBRE DEL PRODUCTO ---
                       Text(
                         product.name,
                         maxLines: 2,
                         textAlign: TextAlign.center,
+                        overflow:
+                            TextOverflow.ellipsis, // Pone "..." si es muy largo
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          height: 1.1,
+                          height: 1.2,
+                          color: Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 10),
 
-                      // PRECIO
+                      // --- 4. PRECIO O AVISO DE AGOTADO ---
                       if (isOutOfStock)
-                        const Text(
-                          "AGOTADO",
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            "AGOTADO",
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
                           ),
                         )
                       else

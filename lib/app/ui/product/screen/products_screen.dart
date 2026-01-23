@@ -21,11 +21,15 @@ class ProductsScreen extends StatefulWidget {
   State<ProductsScreen> createState() => _ProductsScreenState();
 }
 
-class _ProductsScreenState extends State<ProductsScreen> {
-  // Controlador para el scroll infinito
+// 🔥 1. AGREGAMOS EL MIXIN AQUÍ
+class _ProductsScreenState extends State<ProductsScreen>
+    with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
-  // Controlador para el buscador
   final TextEditingController _searchController = TextEditingController();
+
+  // 🔥 2. ACTIVAMOS EL "MANTENER VIVO"
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -36,7 +40,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos los datos del Layout (Perfil, Categorías, Marcas)
+    // 🔥 3. OBLIGATORIO LLAMAR A SUPER.BUILD
+    super.build(context);
+
     final layoutModel = context.watch<LayoutHomeViewmodel>();
 
     return ChangeNotifierProvider(
@@ -45,7 +51,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
         builder: (context, controller, _) {
           return NotificationListener<ScrollNotification>(
             onNotification: (ScrollNotification scrollInfo) {
-              // Lógica de Scroll Infinito
               if (scrollInfo.metrics.pixels >=
                       scrollInfo.metrics.maxScrollExtent - 200 &&
                   !controller.loading &&
@@ -56,15 +61,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
             },
             child: Column(
               children: [
-                // ---------------------------------------------------------
-                // 1. ZONA DE CABECERA (Header, Buscador, Categorías)
-                // ---------------------------------------------------------
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Column(
                     children: [
-                      // Header
                       HeaderHomeW(
                         profileName: layoutModel.profileName ?? '',
                         logout: () async {
@@ -74,23 +75,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           }
                         },
                       ),
-
-                      // Buscador
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: SearchW(controller: _searchController),
                       ),
-
-                      // 🔥 Filtro de Categorías y Marcas 🔥
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: CategoryFilterW(
                           categories: layoutModel.categories,
                           brands: layoutModel.brands,
-
-                          // ✅ AQUÍ ESTABA EL ERROR: Faltaba esta función
                           onFilterChanged: (int? categoryId, int? brandId) {
-                            // Llamamos al controlador para aplicar los filtros
                             controller.applyFilters(
                               category: categoryId,
                               brand: brandId,
@@ -98,16 +92,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           },
                         ),
                       ),
-
-                      // Título de Sección "Productos"
                       const SectionTitleW(),
                     ],
                   ),
                 ),
-
-                // ---------------------------------------------------------
-                // 2. LISTA DE PRODUCTOS (GRID)
-                // ---------------------------------------------------------
                 Expanded(child: _buildProductContent(controller)),
               ],
             ),
@@ -118,12 +106,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Widget _buildProductContent(ProductsController controller) {
-    // 1. Cargando inicial
     if (controller.loading && controller.products.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // 2. Error
     if (controller.error != null && controller.products.isEmpty) {
       return Center(
         child: Column(
@@ -140,12 +126,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
       );
     }
 
-    // 3. Vacío
     if (controller.products.isEmpty) {
       return const Center(child: Text('No hay productos disponibles.'));
     }
 
-    // 4. Grid con Scroll Infinito
     return ProductGrid(
       products: controller.products,
       scrollController: _scrollController,

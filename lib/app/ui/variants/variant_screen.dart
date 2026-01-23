@@ -26,6 +26,7 @@ class _VariantScreenState extends State<VariantScreen> {
   final PageController _pageController = PageController();
   final Color _primaryColor = const Color(0xFF7E33A3);
 
+  // Corrección de URLs para desarrollo local vs producción
   String _fixImageUrl(String? url) {
     if (url == null || url.isEmpty) {
       return 'https://via.placeholder.com/300';
@@ -41,28 +42,20 @@ class _VariantScreenState extends State<VariantScreen> {
     return url;
   }
 
-  // 🔥 SALIDA SEGURA Y LIMPIA
+  // 🔥 LA SOLUCIÓN AL PROBLEMA DE "HOME VACÍO"
   void _safeExit() {
-    // 1. Mensaje visual para confirmar acción
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("🔄 Volviendo al inicio..."),
-        duration: Duration(milliseconds: 500),
-        backgroundColor: Colors.black87,
-      ),
-    );
+    // 1. Ocultamos teclado si estaba abierto
+    FocusScope.of(context).unfocus();
 
-    // 2. Navegación segura
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        try {
-          context.go('/home');
-        } catch (e) {
-          // Si falla, intentamos login como respaldo
-          context.go('/login');
-        }
-      }
-    });
+    // 2. Lógica inteligente
+    if (context.canPop()) {
+      // ✅ Si hay historial (viniste del Home), volvemos suavemente.
+      // Esto NO recarga el Home, solo quita esta pantalla de encima.
+      context.pop();
+    } else {
+      // ⚠️ Si no hay historial (ej. notificación push), forzamos ir al inicio.
+      context.go('/home');
+    }
   }
 
   @override
@@ -75,17 +68,16 @@ class _VariantScreenState extends State<VariantScreen> {
       child: Scaffold(
         backgroundColor: Colors.white,
 
-        // Bloqueamos la salida nativa
+        // Interceptamos el botón "Atrás" físico de Android/Gestos de iOS
         body: PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
-            if (didPop) {
-              return;
-            }
-            _safeExit();
+            if (didPop) return;
+            _safeExit(); // Usamos nuestra lógica segura
           },
           child: Consumer<VariantController>(
             builder: (context, controller, _) {
+              // 1. Estados de Carga y Error
               if (controller.loading) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -96,24 +88,25 @@ class _VariantScreenState extends State<VariantScreen> {
                 return _buildErrorState(context, "Producto no encontrado");
               }
 
+              // 2. Datos del Producto
               final data = controller.product!;
               final variant = data.selectedVariant;
 
-              // ✅ CORREGIDO: Sin signos '??' innecesarios
               final String brandName = data.brand.toUpperCase();
               final String productName = data.name;
               final String sku = variant.sku;
               final String description = data.description;
               final double price = variant.price;
 
+              // Lógica de stock visual
               _updateQuantityLogic(variant);
-              final int currentDisplayedStock = (variant.stock > 0)
-                  ? (variant.stock - _quantity)
-                  : 0;
+              final int currentDisplayedStock =
+                  (variant.stock > 0) ? (variant.stock - _quantity) : 0;
 
               return CustomScrollView(
                 physics: const BouncingScrollPhysics(),
                 slivers: [
+                  // --- IMAGEN Y CABECERA ---
                   SliverAppBar(
                     expandedHeight: 400,
                     backgroundColor: Colors.white,
@@ -128,7 +121,7 @@ class _VariantScreenState extends State<VariantScreen> {
                             Icons.arrow_back,
                             color: Colors.black87,
                           ),
-                          onPressed: _safeExit,
+                          onPressed: _safeExit, // 👈 Botón corregido
                         ),
                       ),
                     ),
@@ -140,6 +133,8 @@ class _VariantScreenState extends State<VariantScreen> {
                       ),
                     ),
                   ),
+
+                  // --- DETALLES DEL PRODUCTO ---
                   SliverToBoxAdapter(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -151,10 +146,18 @@ class _VariantScreenState extends State<VariantScreen> {
                         borderRadius: BorderRadius.vertical(
                           top: Radius.circular(30),
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            offset: Offset(0, -5),
+                          )
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Marca y SKU
                           Row(
                             children: [
                               Container(
@@ -186,6 +189,8 @@ class _VariantScreenState extends State<VariantScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
+
+                          // Nombre
                           Text(
                             productName,
                             style: const TextStyle(
@@ -194,6 +199,8 @@ class _VariantScreenState extends State<VariantScreen> {
                             ),
                           ),
                           const SizedBox(height: 15),
+
+                          // Precio y Stock
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
@@ -218,6 +225,8 @@ class _VariantScreenState extends State<VariantScreen> {
                             ],
                           ),
                           const SizedBox(height: 25),
+
+                          // Selector de Color
                           Row(
                             children: [
                               const Text(
@@ -244,6 +253,8 @@ class _VariantScreenState extends State<VariantScreen> {
                             ],
                           ),
                           const SizedBox(height: 25),
+
+                          // Selector de Cantidad
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -283,6 +294,8 @@ class _VariantScreenState extends State<VariantScreen> {
                             ],
                           ),
                           const SizedBox(height: 30),
+
+                          // Descripción
                           const Text(
                             "Descripción",
                             style: TextStyle(
@@ -312,6 +325,7 @@ class _VariantScreenState extends State<VariantScreen> {
     );
   }
 
+  // Pantalla de error simple con botón de salida segura
   Widget _buildErrorState(BuildContext context, String message) {
     return Scaffold(
       appBar: AppBar(
@@ -324,6 +338,7 @@ class _VariantScreenState extends State<VariantScreen> {
     );
   }
 
+  // Lógica para que la cantidad no supere el stock al cambiar variantes
   void _updateQuantityLogic(dynamic variant) {
     if (variant.stock <= 0) {
       if (_quantity != 0) {

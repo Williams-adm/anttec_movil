@@ -1,5 +1,3 @@
-// Archivo: lib/routing/routes.dart
-
 abstract final class Routes {
   static const splash = '/';
   static const login = '/login';
@@ -7,4 +5,7 @@ abstract final class Routes {
   static const scan = '/scan';
   static const cart = '/cart';
   static const finalizarVenta = '/finalizar-venta';
+
+  // 🔥 NUEVA: Ruta relativa (sin slash al inicio) para usar dentro del Home
+  static const productDetail = '/producto/:sku';
 }

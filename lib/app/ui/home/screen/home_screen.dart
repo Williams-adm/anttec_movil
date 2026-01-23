@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart'; // ✅ Importar GoRouter
 import 'package:anttec_movil/app/ui/product/screen/products_screen.dart';
-import 'package:anttec_movil/app/ui/chat/screen/chat_screen.dart';
+
+// No necesitamos importar chat_screen aqui porque usaremos la ruta '/chat'
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,18 +54,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
+      // Aquí llamamos a la pantalla que tiene la lista (y el error de navegación)
       body: ProductsScreen(token: _token!),
 
-      // ✅ CORREGIDO: 'child' ahora está al final
+      // ✅ BOTÓN FLOTANTE CHAT (Optimizado)
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ChatScreen()),
-          );
+          // Usamos push para ir al chat sin borrar el home
+          context.push('/chat');
         },
         backgroundColor: const Color(0xFF7E33A3),
-        tooltip: 'Asistente IA', // Tooltip va antes que child
+        tooltip: 'Asistente IA',
         child: const Icon(Icons.auto_awesome, color: Colors.white),
       ),
     );
