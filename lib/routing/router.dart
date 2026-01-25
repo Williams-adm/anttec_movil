@@ -12,7 +12,7 @@ import 'package:anttec_movil/app/ui/home/screen/home_screen.dart';
 // Layouts
 import 'package:anttec_movil/app/ui/layout/screen/layout_screen.dart';
 import 'package:anttec_movil/app/ui/layout/screen/layout_home_screen.dart';
-import 'package:anttec_movil/app/ui/layout/screen/layout_pages_screen.dart';
+// import 'package:anttec_movil/app/ui/layout/screen/layout_pages_screen.dart'; // YA NO LO NECESITAMOS AQUÍ
 
 import 'package:anttec_movil/app/ui/scan/screen/scan_screen.dart';
 import 'package:anttec_movil/app/ui/cart/screen/cart_screen.dart';
@@ -28,7 +28,7 @@ GoRouter router() => GoRouter(
       debugLogDiagnostics: true,
       routes: [
         // ===========================================================
-        // NIVEL RAÍZ (Pantallas completas sin menú inferior)
+        // 1. NIVEL RAÍZ (Pantallas completas sin menú inferior)
         // ===========================================================
         GoRoute(
           path: Routes.splash,
@@ -49,7 +49,7 @@ GoRouter router() => GoRouter(
           builder: (context, state) => const ChatScreen(),
         ),
 
-        // ✅ PRODUCTO (Correcto: Está afuera del Shell)
+        // ✅ PRODUCTO
         GoRoute(
           path: '/producto/:sku',
           name: 'product_detail',
@@ -71,9 +71,7 @@ GoRouter router() => GoRouter(
           },
         ),
 
-        // ✅ FINALIZAR VENTA (MOVIDO AQUÍ)
-        // Antes estaba dentro del Shell y causaba el error rojo.
-        // Ahora está afuera y funcionará perfecto.
+        // ✅ FINALIZAR VENTA
         GoRoute(
           path: Routes.finalizarVenta,
           name: 'finalizar-venta',
@@ -81,8 +79,17 @@ GoRouter router() => GoRouter(
           builder: (context, state) => const FinalizarVentaPage(),
         ),
 
+        // ✅ SCANNER (MOVIDO AQUÍ - PANTALLA COMPLETA)
+        // Al estar aquí arriba, ignora el LayoutPagesScreen y el menú inferior.
+        GoRoute(
+          path: Routes.scan,
+          name: 'scan',
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => const ScanScreen(),
+        ),
+
         // ===========================================================
-        // SHELL ROUTE (Pantallas con menú inferior)
+        // 2. SHELL ROUTE (Pantallas con menú inferior)
         // ===========================================================
         ShellRoute(
           builder: (context, state, child) => LayoutScreen(content: child),
@@ -96,9 +103,7 @@ GoRouter router() => GoRouter(
                   path: Routes.home,
                   name: 'home',
                   builder: (context, state) => HomeScreen(),
-                  // ✅ Home limpio sin hijos conflictivos
                 ),
-                // 🗑️ Aquí borramos finalizar-venta porque ya lo subimos
               ],
             ),
 
@@ -109,23 +114,7 @@ GoRouter router() => GoRouter(
               builder: (context, state) => const CartScreen(),
             ),
 
-            // PESTAÑA SCAN
-            ShellRoute(
-              builder: (context, state, child) {
-                String title = '';
-                if (state.extra is Map<String, dynamic>) {
-                  title = (state.extra as Map<String, dynamic>)['title'] ?? '';
-                }
-                return LayoutPagesScreen(title: title, content: child);
-              },
-              routes: [
-                GoRoute(
-                  path: Routes.scan,
-                  name: 'scan',
-                  builder: (context, state) => ScanScreen(),
-                ),
-              ],
-            ),
+            // ❌ EL BLOQUE 'LAYOUT PAGES' FUE ELIMINADO PORQUE EL SCAN SUBIÓ
           ],
         ),
       ],
