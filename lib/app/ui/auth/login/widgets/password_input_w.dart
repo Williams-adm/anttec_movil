@@ -1,11 +1,11 @@
-import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:flutter/material.dart';
+import 'package:anttec_movil/app/core/styles/colors.dart';
+// Asegúrate de tener esta librería o usa Icons.visibility nativo
 import 'package:material_symbols_icons/symbols.dart';
 
 class PasswordInputW extends StatefulWidget {
   final TextEditingController controller;
-  // Opcional: Permite ejecutar la acción de login al dar Enter en el teclado
-  final VoidCallback? onFieldSubmitted;
+  final VoidCallback? onFieldSubmitted; // Para dar Enter y entrar
 
   const PasswordInputW({
     super.key,
@@ -48,20 +48,17 @@ class _PasswordInputWState extends State<PasswordInputW> {
     return TextFormField(
       controller: widget.controller,
       obscureText: _obscure,
-      // --- UX MODERNA ---
+      // --- CONFIGURACIÓN PARA GOOGLE AUTOFILL ---
       keyboardType: TextInputType.visiblePassword,
-      textInputAction: TextInputAction.done, // Muestra botón "Check/Ir"
-      autofillHints: const [
-        AutofillHints.password,
-      ], // Integración con gestor de contraseñas
+      textInputAction: TextInputAction.done, // Botón de "Ir" o "Check"
+      autofillHints: const [AutofillHints.password], // 🔥 Clave para Smart Lock
       onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
-      // ------------------
+      // ------------------------------------------
       validator: (value) {
         if (value == null || value.isEmpty) {
           return 'La contraseña es requerida';
         }
         if (value.length < 6) {
-          // Ajustado a estándar común (6 u 8)
           return 'Mínimo 6 caracteres';
         }
         return null;
@@ -69,29 +66,31 @@ class _PasswordInputWState extends State<PasswordInputW> {
       style: const TextStyle(fontSize: 16),
       decoration: InputDecoration(
         hintText: '••••••••',
-        hintStyle: const TextStyle(color: AppColors.semidarkT),
+        hintStyle: const TextStyle(color: Colors.grey),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide.none,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
           borderSide: const BorderSide(color: AppColors.primaryP, width: 2),
         ),
         filled: true,
-        fillColor: _hasText ? AppColors.tertiaryS : Colors.grey.shade50,
+        fillColor: _hasText ? const Color(0xFFE8F0FE) : Colors.transparent,
         suffixIcon: IconButton(
           onPressed: () {
             setState(() {
               _obscure = !_obscure;
             });
           },
-          // Color sutil para el icono
           icon: Icon(
             _obscure ? Symbols.visibility_off : Symbols.visibility,
             color: Colors.grey,

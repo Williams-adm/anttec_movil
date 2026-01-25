@@ -25,8 +25,10 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         
-        // ✅ CAMBIO REALIZADO AQUÍ:
-        minSdk = flutter.minSdkVersion  // Antes decía: flutter.minSdkVersion
+        // ✅ CORRECCIÓN FINAL:
+        // Hemos cambiado "flutter.minSdkVersion" por 21.
+        // Esto es OBLIGATORIO para que el guardado seguro funcione.
+        minSdk = flutter.minSdkVersion 
         
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

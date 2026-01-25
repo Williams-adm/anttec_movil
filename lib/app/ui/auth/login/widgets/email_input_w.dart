@@ -1,5 +1,7 @@
-import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:flutter/material.dart';
+// Si tienes colores personalizados, mantén tu import.
+// Si no, puedes usar Colors.blue o el que prefieras directamente.
+import 'package:anttec_movil/app/core/styles/colors.dart';
 
 class EmailInputW extends StatefulWidget {
   final TextEditingController controller;
@@ -26,7 +28,6 @@ class _EmailInputWState extends State<EmailInputW> {
     super.dispose();
   }
 
-  // Optimización: Solo redibuja si el estado realmente cambia
   void _updateColor() {
     final hasTextNow = widget.controller.text.isNotEmpty;
     if (_hasText != hasTextNow) {
@@ -40,18 +41,16 @@ class _EmailInputWState extends State<EmailInputW> {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: widget.controller,
-      // --- UX MODERNA ---
-      keyboardType: TextInputType.emailAddress, // Muestra el '@' en el teclado
-      textInputAction: TextInputAction.next, // Muestra botón "Siguiente"
-      autofillHints: const [
-        AutofillHints.email,
-      ], // Permite autocompletar del sistema
-      // ------------------
+      // --- CONFIGURACIÓN PARA GOOGLE AUTOFILL ---
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      autofillHints: const [AutofillHints.email], // 🔥 Clave para Smart Lock
+      // ------------------------------------------
       validator: (value) {
         if (value == null || value.isEmpty) {
           return 'El correo es obligatorio';
         }
-        // Regex optimizado para email
+        // Regex robusto para email
         const pattern =
             r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9]+\.[a-zA-Z]+";
         final regExp = RegExp(pattern);
@@ -64,26 +63,28 @@ class _EmailInputWState extends State<EmailInputW> {
       style: const TextStyle(fontSize: 16),
       decoration: InputDecoration(
         hintText: 'ejemplo@empresa.com',
-        hintStyle: const TextStyle(color: AppColors.semidarkT),
+        hintStyle: const TextStyle(color: Colors.grey),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
+        // Bordes suaves y redondeados
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: const BorderSide(color: Colors.grey),
+          borderSide: BorderSide
+              .none, // Quitamos borde por defecto si usas container externo
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
           borderSide: const BorderSide(color: AppColors.primaryP, width: 2),
         ),
         filled: true,
-        // Color cambia dinámicamente según si hay texto
-        fillColor: _hasText ? AppColors.tertiaryS : Colors.grey.shade50,
+        // Color de fondo dinámico (opcional, ajusta según tu gusto)
+        fillColor: _hasText ? const Color(0xFFE8F0FE) : Colors.transparent,
       ),
     );
   }
