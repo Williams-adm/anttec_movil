@@ -2,16 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-class AppColors {
-  static const Color background = Color(0xFFF8F9FD);
-  static const Color darkPurple = Color(0xFF7A2E85);
-  static const Color lightPurple = Color(0xFFEBCDF0);
-  static const Color textDark = Color(0xFF1A1A1A);
-  static const Color deleteRed = Color(0xFFE74C3C);
-  static const Color qtyBackground = Color(0xFFE0E0E0);
-}
+// Importamos nuestros widgets separados
+import 'package:anttec_movil/app/ui/cart/widgets/cart_constants.dart';
+import 'package:anttec_movil/app/ui/cart/widgets/cart_item_card.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -29,7 +23,6 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  // Función para mostrar alerta antes de vaciar todo
   void _showClearCartConfirmation(BuildContext context, CartProvider provider) {
     showDialog(
       context: context,
@@ -44,7 +37,7 @@ class _CartScreenState extends State<CartScreen> {
           ),
           TextButton(
             onPressed: () {
-              provider.clearCart(); // Llama a la API de borrar todo
+              provider.clearCart();
               Navigator.pop(ctx);
             },
             child: const Text("Sí, vaciar",
@@ -63,20 +56,17 @@ class _CartScreenState extends State<CartScreen> {
       body: SafeArea(
         child: Consumer<CartProvider>(
           builder: (context, cartProvider, child) {
-            // 1. Estado Cargando
             if (cartProvider.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            // 2. Estado Vacío
             if (cartProvider.items.isEmpty) {
               return _buildEmptyState(cartProvider);
             }
 
-            // 3. Contenido Principal
             return Column(
               children: [
-                // --- Cabecera con Tacho Global ---
+                // --- Cabecera ---
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                   child: Row(
@@ -90,18 +80,13 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                       ),
                       const Spacer(),
-
                       IconButton(
-                        tooltip: "Vaciar carrito",
                         icon: const Icon(Icons.delete_forever,
                             size: 28, color: AppColors.deleteRed),
                         onPressed: () =>
                             _showClearCartConfirmation(context, cartProvider),
                       ),
-
                       const SizedBox(width: 8),
-
-                      // Botón Cerrar (CORREGIDO)
                       IconButton(
                         icon: const Icon(Icons.close,
                             size: 30, color: AppColors.textDark),
@@ -117,7 +102,7 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                 ),
 
-                // --- Lista de Productos ---
+                // --- Lista de Productos (Usando el Widget separado) ---
                 Expanded(
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -125,7 +110,8 @@ class _CartScreenState extends State<CartScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 15),
                     itemBuilder: (context, index) {
                       final item = cartProvider.items[index];
-                      return _buildProductCard(context, item, cartProvider);
+                      // ✅ Aquí usamos nuestro componente limpio
+                      return CartItemCard(item: item, provider: cartProvider);
                     },
                   ),
                 ),
@@ -138,7 +124,6 @@ class _CartScreenState extends State<CartScreen> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            // CORREGIDO: Bloques if con llaves
                             if (context.canPop()) {
                               context.pop();
                             } else {
@@ -164,9 +149,7 @@ class _CartScreenState extends State<CartScreen> {
                       const SizedBox(width: 15),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
-                            context.pushNamed('checkout');
-                          },
+                          onPressed: () => context.pushNamed('checkout'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.darkPurple,
                             foregroundColor: Colors.white,
@@ -190,139 +173,6 @@ class _CartScreenState extends State<CartScreen> {
             );
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildProductCard(
-      BuildContext context, dynamic item, CartProvider provider) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  item.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: AppColors.textDark,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-
-              // 🗑️ BOTÓN 2: ELIMINAR SOLO ESTE ITEM
-              InkWell(
-                onTap: () {
-                  // Llama a la API de eliminar un solo item
-                  provider.removeItem(item.id!);
-                },
-                child: const Padding(
-                  padding: EdgeInsets.only(left: 8.0, bottom: 8.0),
-                  child: Icon(Icons.delete_outline,
-                      color: AppColors.deleteRed, size: 26),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Container(
-                width: 100,
-                height: 80,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white,
-                ),
-                child: CachedNetworkImage(
-                  imageUrl: item.image ?? "",
-                  fit: BoxFit.contain,
-                  placeholder: (_, __) =>
-                      const Icon(Icons.image, color: Colors.grey),
-                  errorWidget: (_, __, ___) =>
-                      const Icon(Icons.broken_image, color: Colors.grey),
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    RichText(
-                      text: TextSpan(
-                        style: const TextStyle(
-                            color: AppColors.textDark, fontSize: 16),
-                        children: [
-                          const TextSpan(
-                              text: 'Precio  ',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          TextSpan(text: 'S/. ${item.price}'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('Cantidad',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _qtyButton(Icons.remove, () {
-                          if (item.quantity > 1) {
-                            provider.updateItem(item.id!, item.quantity - 1);
-                          }
-                        }),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 15),
-                          child: Text(
-                            '${item.quantity}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 18),
-                          ),
-                        ),
-                        _qtyButton(Icons.add, () {
-                          provider.updateItem(item.id!, item.quantity + 1);
-                        }),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _qtyButton(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: AppColors.qtyBackground,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, size: 20, color: AppColors.textDark),
       ),
     );
   }
