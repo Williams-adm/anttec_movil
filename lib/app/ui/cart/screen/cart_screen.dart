@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-// Colores del diseño
 class AppColors {
   static const Color background = Color(0xFFF8F9FD);
   static const Color darkPurple = Color(0xFF7A2E85);
@@ -30,6 +29,33 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
+  // Función para mostrar alerta antes de vaciar todo
+  void _showClearCartConfirmation(BuildContext context, CartProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("¿Vaciar carrito?"),
+        content: const Text("Se eliminarán todos los productos de tu lista."),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              provider.clearCart(); // Llama a la API de borrar todo
+              Navigator.pop(ctx);
+            },
+            child: const Text("Sí, vaciar",
+                style: TextStyle(
+                    color: AppColors.deleteRed, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,20 +76,32 @@ class _CartScreenState extends State<CartScreen> {
             // 3. Contenido Principal
             return Column(
               children: [
-                // --- Cabecera ---
+                // --- Cabecera con Tacho Global ---
                 Padding(
-                  padding: const EdgeInsets.all(20.0),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         'Resumen de venta',
                         style: TextStyle(
-                          fontSize: 26,
+                          fontSize: 24,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textDark,
                         ),
                       ),
+                      const Spacer(),
+
+                      IconButton(
+                        tooltip: "Vaciar carrito",
+                        icon: const Icon(Icons.delete_forever,
+                            size: 28, color: AppColors.deleteRed),
+                        onPressed: () =>
+                            _showClearCartConfirmation(context, cartProvider),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      // Botón Cerrar (CORREGIDO)
                       IconButton(
                         icon: const Icon(Icons.close,
                             size: 30, color: AppColors.textDark),
@@ -97,10 +135,10 @@ class _CartScreenState extends State<CartScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 15, 20, 20),
                   child: Row(
                     children: [
-                      // Botón: Añadir más
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
+                            // CORREGIDO: Bloques if con llaves
                             if (context.canPop()) {
                               context.pop();
                             } else {
@@ -113,8 +151,7 @@ class _CartScreenState extends State<CartScreen> {
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           child: const Text(
                             'Añadir más\nproductos',
@@ -125,7 +162,6 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                       ),
                       const SizedBox(width: 15),
-                      // Botón: Finalizar venta
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
@@ -137,8 +173,7 @@ class _CartScreenState extends State<CartScreen> {
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           child: const Text(
                             'Finalizar\nventa',
@@ -156,8 +191,6 @@ class _CartScreenState extends State<CartScreen> {
           },
         ),
       ),
-      // 🔥 HE ELIMINADO EL 'bottomNavigationBar' Y 'floatingActionButton' DE AQUÍ
-      // PARA QUE NO SE DUPLIQUEN CON LOS DE TU PANTALLA PRINCIPAL
     );
   }
 
@@ -193,8 +226,13 @@ class _CartScreenState extends State<CartScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+
+              // 🗑️ BOTÓN 2: ELIMINAR SOLO ESTE ITEM
               InkWell(
-                onTap: () => provider.removeItem(item.id!),
+                onTap: () {
+                  // Llama a la API de eliminar un solo item
+                  provider.removeItem(item.id!);
+                },
                 child: const Padding(
                   padding: EdgeInsets.only(left: 8.0, bottom: 8.0),
                   child: Icon(Icons.delete_outline,
@@ -233,19 +271,16 @@ class _CartScreenState extends State<CartScreen> {
                             color: AppColors.textDark, fontSize: 16),
                         children: [
                           const TextSpan(
-                            text: 'Precio  ',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                              text: 'Precio  ',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                           TextSpan(text: 'S/. ${item.price}'),
                         ],
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Cantidad',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
+                    const Text('Cantidad',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -304,11 +339,12 @@ class _CartScreenState extends State<CartScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           ElevatedButton(
-              onPressed: () => provider.fetchCart(),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.darkPurple,
-                  foregroundColor: Colors.white),
-              child: const Text("Recargar"))
+            onPressed: () => provider.fetchCart(),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.darkPurple,
+                foregroundColor: Colors.white),
+            child: const Text("Recargar"),
+          )
         ],
       ),
     );
