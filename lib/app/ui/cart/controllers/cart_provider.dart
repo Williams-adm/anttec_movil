@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:anttec_movil/app/ui/cart/model/cart_item.dart';
-import 'package:anttec_movil/app/ui/cart/repositories/cart_repository.dart'; // Importa tu repo
+import 'package:anttec_movil/app/ui/cart/repositories/cart_repository.dart';
 
 class CartProvider extends ChangeNotifier {
   final CartRepository _cartRepository;
@@ -8,41 +8,42 @@ class CartProvider extends ChangeNotifier {
   CartProvider(this._cartRepository);
 
   List<CartItem> _items = [];
-  bool _isLoading = false;
-  String? _errorMessage;
-
   List<CartItem> get items => _items;
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
 
-  // Calcular total
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  String? errorMessage;
+
+  // Calculamos el total sumando (precio * cantidad) de cada ítem
   double get totalAmount {
-    var total = 0.0;
-    for (var item in _items) {
-      total += item.price * item.quantity;
-    }
-    return total;
+    return _items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
   }
 
-  int get itemCount => _items.length;
+  // Total de artículos (suma de cantidades) para el badge del ícono
+  int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
 
-  // --- OBTENER CARRITO (GET) ---
+  // ===========================================================================
+  // 📥 OBTENER CARRITO
+  // ===========================================================================
   Future<void> fetchCart() async {
     _isLoading = true;
-    _errorMessage = null;
     notifyListeners();
-
     try {
       _items = await _cartRepository.getCart();
+      errorMessage = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      errorMessage = e.toString();
+      _items = [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // --- AGREGAR (POST) ---
+  // ===========================================================================
+  // ➕ AGREGAR ITEM
+  // ===========================================================================
   Future<bool> addItem({
     required int productId,
     int? variantId,
@@ -54,47 +55,58 @@ class CartProvider extends ChangeNotifier {
         variantId: variantId,
         quantity: quantity,
       );
-      // Recargamos el carrito para traer los datos frescos con el ID generado por la BD
-      await fetchCart();
+      await fetchCart(); // Recargamos para actualizar el badge y la lista
       return true;
     } catch (e) {
-      _errorMessage = "Error al agregar al carrito";
+      errorMessage = e.toString();
       notifyListeners();
       return false;
     }
   }
 
-  // --- ACTUALIZAR CANTIDAD (PUT) ---
-  Future<void> updateQuantity(int itemId, int newQuantity) async {
-    // Optimistic UI: Actualizamos visualmente antes de llamar a la API
-    // (Opcional, aquí lo haremos esperando la respuesta para asegurar consistencia)
+  // ===========================================================================
+  // 🔄 ACTUALIZAR CANTIDAD (¡ESTA ES LA QUE FALTABA!)
+  // ===========================================================================
+  Future<void> updateItem(int itemId, int quantity) async {
     try {
-      await _cartRepository.updateItem(itemId, newQuantity);
+      // 1. Llamamos al repositorio para que hable con la API
+      await _cartRepository.updateItem(itemId, quantity);
+
+      // 2. Recargamos la lista para ver el nuevo total y cantidad
       await fetchCart();
     } catch (e) {
-      // Manejar error
+      debugPrint("Error actualizando item: $e");
+      errorMessage = "No se pudo actualizar la cantidad";
+      notifyListeners();
     }
   }
 
-  // --- ELIMINAR ÍTEM (DELETE) ---
+  // ===========================================================================
+  // 🗑️ ELIMINAR ITEM
+  // ===========================================================================
   Future<void> removeItem(int itemId) async {
     try {
       await _cartRepository.removeItem(itemId);
-      _items.removeWhere((item) => item.id == itemId);
-      notifyListeners();
+      await fetchCart(); // Recargamos la lista tras borrar
     } catch (e) {
-      // Manejar error
+      debugPrint("Error eliminando item: $e");
+      errorMessage = "No se pudo eliminar el producto";
+      notifyListeners();
     }
   }
 
-  // --- VACIAR CARRITO (DELETE) ---
+  // ===========================================================================
+  // 🧹 VACIAR CARRITO
+  // ===========================================================================
   Future<void> clearCart() async {
     try {
       await _cartRepository.clearCart();
       _items = [];
       notifyListeners();
     } catch (e) {
-      // Manejar error
+      debugPrint("Error vaciando carrito: $e");
+      errorMessage = "Error al vaciar el carrito";
+      notifyListeners();
     }
   }
 }
