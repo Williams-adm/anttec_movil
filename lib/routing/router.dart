@@ -17,7 +17,7 @@ import 'package:anttec_movil/app/ui/layout/screen/layout_home_screen.dart';
 import 'package:anttec_movil/app/ui/scan/screen/scan_screen.dart';
 import 'package:anttec_movil/app/ui/cart/screen/cart_screen.dart';
 import 'package:anttec_movil/app/ui/sales/finalizar_venta_page.dart';
-import 'package:anttec_movil/app/ui/variants/variant_screen.dart';
+import 'package:anttec_movil/app/ui/variants/screen/variant_screen.dart';
 import 'package:anttec_movil/app/ui/chat/screen/chat_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
