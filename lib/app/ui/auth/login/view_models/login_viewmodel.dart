@@ -40,9 +40,23 @@ class LoginViewModel extends ChangeNotifier {
           await _authRepository.login(email: email, password: password);
 
       if (result.success) {
-        // 🔥 GUARDADO LOCAL CON SHAREDPREFERENCES
-        debugPrint(
-            "💾 Intentando guardar credenciales... Checkbox activo: $_rememberMe");
+        // ============================================================
+        // 🔥 CORRECCIÓN CRUCIAL: GUARDAR EL TOKEN PARA LA API
+        // ============================================================
+        final prefs = await SharedPreferences.getInstance();
+
+        // Verificamos que el token venga en la respuesta
+        if (result.token.isNotEmpty) {
+          await prefs.setString('auth_token', result.token);
+          debugPrint(
+              "🔑 LOGIN: Token guardado en memoria: ${result.token.substring(0, 10)}...");
+        } else {
+          debugPrint("⚠️ LOGIN: El backend respondió success pero SIN token.");
+        }
+        // ============================================================
+
+        // 🔥 GUARDADO LOCAL "RECUÉRDAME" (EMAIL/PASS)
+        debugPrint("💾 Procesando Recuérdame... Checkbox activo: $_rememberMe");
         await _handleRememberMe(email, password);
 
         return true;
@@ -102,12 +116,12 @@ class LoginViewModel extends ChangeNotifier {
       await prefs.setBool('remember_me', true);
       await prefs.setString('saved_email', email);
       await prefs.setString('saved_password', password);
-      debugPrint("✅ Datos guardados EXITOSAMENTE en disco.");
+      debugPrint("✅ Credenciales guardadas EXITOSAMENTE en disco.");
     } else {
       await prefs.remove('remember_me');
       await prefs.remove('saved_email');
       await prefs.remove('saved_password');
-      debugPrint("🗑️ Datos borrados del disco.");
+      debugPrint("🗑️ Credenciales borradas del disco.");
     }
   }
 }

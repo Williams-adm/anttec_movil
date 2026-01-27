@@ -1,86 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
   @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 🔥 FORZAR CARGA DE DATOS AL ENTRAR
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CartProvider>().fetchCart();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Simula la lista de productos agregados al carrito
-    final List products = []; // Cambia por tu lógica real
+    // Usamos Consumer para escuchar cambios
+    return Consumer<CartProvider>(
+      builder: (context, cartProvider, child) {
+        // 1. Cargando...
+        if (cartProvider.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    if (products.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Resumen de venta'),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.close),
-              onPressed: () => Navigator.of(context).pop(),
+        // 2. Carrito Vacío
+        if (cartProvider.items.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Mi Carrito')),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.shopping_cart_outlined,
+                      size: 80, color: Colors.grey),
+                  const SizedBox(height: 20),
+                  const Text("Tu carrito está vacío",
+                      style: TextStyle(fontSize: 18)),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                      onPressed: () {
+                        // Botón de depuración para intentar recargar manual
+                        cartProvider.fetchCart();
+                      },
+                      child: const Text("Recargar"))
+                ],
+              ),
             ),
-          ],
-        ),
-        body: Center(
-          child: Container(
-            margin: const EdgeInsets.all(24),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.blueAccent),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'El resumen de ventas se encuentra vacío',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                // Reemplaza esta imagen por tu asset o network
-                Image.asset(
-                  'assets/img/cart_empty.png',
-                  width: 120,
-                  height: 120,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF8739B1),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () {
-                      // Por ejemplo, vuelve atrás o navega a productos
-                      Navigator.of(context).pop();
-                    },
-                    child: Text(
-                      'Agregar productos',
-                      style: TextStyle(fontSize: 17, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          );
+        }
+
+        // 3. Lista de Productos
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Mi Carrito'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.delete_sweep, color: Colors.red),
+                onPressed: () => cartProvider.clearCart(),
+              )
+            ],
           ),
-        ),
-        backgroundColor: Color(0xFFF8F6FC),
-      );
-    }
-
-    // Aquí tu código para mostrar los productos cuando SÍ hay elementos en el carrito
-    return Scaffold(
-      appBar: AppBar(title: Text('Resumen de venta')),
-      body: ListView(
-        children: [
-          // Listar productos
-        ],
-      ),
+          body: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: cartProvider.items.length,
+                  itemBuilder: (context, index) {
+                    final item = cartProvider.items[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        leading: CachedNetworkImage(
+                          imageUrl: item.image,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => const Icon(Icons.image),
+                          errorWidget: (_, __, ___) =>
+                              const Icon(Icons.broken_image),
+                        ),
+                        title: Text(item.name),
+                        subtitle: Text("${item.quantity} x S/. ${item.price}"),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.grey),
+                          onPressed: () => cartProvider.removeItem(item.id!),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // Total y Botón Pagar
+              Container(
+                padding: const EdgeInsets.all(20),
+                color: Colors.white,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Total: S/. ${cartProvider.totalAmount.toStringAsFixed(2)}",
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {},
+                      child: const Text("Pagar"),
+                    ),
+                  ],
+                ),
+              )
+            ],
+          ),
+        );
+      },
     );
   }
 }
