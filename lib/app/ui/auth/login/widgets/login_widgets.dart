@@ -80,10 +80,13 @@ class LoginRememberMe extends StatelessWidget {
   }
 }
 
-// 5. EL BOTÓN MORADO
+// 5. EL BOTÓN MORADO (CORREGIDO)
 class LoginButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onPressed;
+
+  // Color Solicitado
+  static const Color darkPurple = Color(0xFF7A2E85);
 
   const LoginButton({
     super.key,
@@ -98,9 +101,9 @@ class LoginButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: LoginStyles.buttonColor,
-          disabledBackgroundColor:
-              LoginStyles.buttonColor.withValues(alpha: 0.6),
+          backgroundColor: darkPurple,
+          // ✅ CORRECCIÓN: Usamos .withValues(alpha: ...) en lugar de .withOpacity(...)
+          disabledBackgroundColor: darkPurple.withValues(alpha: 0.6),
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.0),

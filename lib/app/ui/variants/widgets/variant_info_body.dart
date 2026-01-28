@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+
+// ✅ CORRECCIÓN CLAVE: Usamos el archivo original de tu proyecto
+// Asegúrate de que esta ruta sea exacta según tu estructura de carpetas
+import 'package:anttec_movil/data/services/api/v1/model/product/product_detail_response.dart';
+
 import '../widgets/color_selector.dart';
 import '../widgets/quantity_selector.dart';
 
@@ -9,16 +14,18 @@ class VariantInfoBody extends StatelessWidget {
   final double price;
   final int currentDisplayedStock;
   final String description;
-  final dynamic data; // Datos completos del producto
-  final dynamic variant; // Variante seleccionada
+  final dynamic data;
+  final dynamic variant;
 
   // Callbacks y estado
   final Function(int) onVariantSelected;
   final int quantity;
-  final Function() onIncrement;
-  final Function() onDecrement;
-  final Function() onAddToCart;
+  final VoidCallback onIncrement;
+  final VoidCallback onDecrement;
+  final VoidCallback onAddToCart;
   final bool isAddingToCart;
+
+  final List<dynamic> variants;
 
   const VariantInfoBody({
     super.key,
@@ -36,9 +43,10 @@ class VariantInfoBody extends StatelessWidget {
     required this.onDecrement,
     required this.onAddToCart,
     required this.isAddingToCart,
+    required this.variants,
   });
 
-  final Color _primaryColor = const Color(0xFF7E33A3);
+  static const Color _primaryColor = Color(0xFF7E33A3);
 
   @override
   Widget build(BuildContext context) {
@@ -61,12 +69,13 @@ class VariantInfoBody extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
+                  // Usamos withValues para evitar deprecation warning
                   color: _primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   brandName.isEmpty ? "ANTTEC" : brandName,
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: _primaryColor),
@@ -92,7 +101,7 @@ class VariantInfoBody extends StatelessWidget {
             children: [
               Text(
                 "S/. ${price.toStringAsFixed(2)}",
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: _primaryColor),
@@ -113,8 +122,10 @@ class VariantInfoBody extends StatelessWidget {
           const Text("Color:",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
+
           ColorSelector(
-            variants: data.variants,
+            // Ahora VariantOption viene del archivo correcto, así que el cast funcionará
+            variants: variants.cast<VariantOption>().toList(),
             selectedId: variant.id,
             primaryColor: _primaryColor,
             onVariantSelected: onVariantSelected,

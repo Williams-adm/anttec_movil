@@ -8,8 +8,8 @@ import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 
 // Widgets Refactorizados
 import 'package:anttec_movil/app/ui/variants/widgets/product_image_gallery.dart';
-import 'package:anttec_movil/app/ui/variants/widgets/variant_info_body.dart';
 import 'package:anttec_movil/app/ui/variants/widgets/variant_utils.dart';
+import 'package:anttec_movil/app/ui/variants/widgets/variant_info_body.dart';
 
 class VariantScreen extends StatefulWidget {
   final int productId;
@@ -45,7 +45,25 @@ class _VariantScreenState extends State<VariantScreen> {
     }
   }
 
-  // --- Lógica de Negocio (Agregar al carrito) ---
+  // --- Lógica: Aumentar Cantidad ---
+  void _incrementQuantity(int maxStock) {
+    if (_quantity < maxStock) {
+      setState(() {
+        _quantity++;
+      });
+    }
+  }
+
+  // --- Lógica: Disminuir Cantidad ---
+  void _decrementQuantity() {
+    if (_quantity > 1) {
+      setState(() {
+        _quantity--;
+      });
+    }
+  }
+
+  // --- Lógica: Agregar al carrito (API) ---
   Future<void> _handleAddToCart(dynamic variant, String productName) async {
     if (_quantity <= 0 || _isAddingToCart) {
       return;
@@ -65,7 +83,6 @@ class _VariantScreenState extends State<VariantScreen> {
       }
 
       if (success) {
-        // Usamos la utilidad separada para mostrar éxito
         VariantUtils.showSuccess(context,
             variant: variant, productName: productName, quantity: _quantity);
       } else {
@@ -85,18 +102,22 @@ class _VariantScreenState extends State<VariantScreen> {
     }
   }
 
-  void _updateQuantityLogic(dynamic variant) {
-    if (variant.stock <= 0) {
+  // Validación de seguridad para que la cantidad no sea inválida si cambia el stock
+  void _validateQuantity(int stock) {
+    if (stock <= 0) {
       if (_quantity != 0) {
-        _quantity = 0;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _quantity = 0);
+        });
       }
-    } else {
-      if (_quantity == 0) {
-        _quantity = 1;
-      }
-      if (_quantity > variant.stock) {
-        _quantity = variant.stock;
-      }
+    } else if (_quantity == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _quantity = 1);
+      });
+    } else if (_quantity > stock) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _quantity = stock);
+      });
     }
   }
 
@@ -112,14 +133,12 @@ class _VariantScreenState extends State<VariantScreen> {
         body: PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
-            if (didPop) {
-              return;
-            }
+            if (didPop) return;
             _safeExit();
           },
           child: Consumer<VariantController>(
             builder: (context, controller, _) {
-              // 1. Manejo de Estados de Carga/Error
+              // 1. Estados de Carga / Error
               if (controller.loading) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -130,19 +149,21 @@ class _VariantScreenState extends State<VariantScreen> {
                 return _buildErrorState(context, "Producto no encontrado");
               }
 
-              // 2. Preparación de Datos
+              // 2. Extraer Datos
               final data = controller.product!;
               final variant = data.selectedVariant;
 
-              _updateQuantityLogic(variant);
-              final int currentDisplayedStock =
+              // Validamos que la cantidad seleccionada sea coherente con el stock actual
+              _validateQuantity(variant.stock);
+
+              // Calculamos el stock visual para pasarlo al widget hijo
+              final int currentStock =
                   (variant.stock > 0) ? (variant.stock - _quantity) : 0;
 
-              // 3. UI Principal
               return CustomScrollView(
                 physics: const BouncingScrollPhysics(),
                 slivers: [
-                  // App Bar con Galería
+                  // App Bar con Galería de Imágenes
                   SliverAppBar(
                     expandedHeight: 400,
                     backgroundColor: Colors.white,
@@ -166,36 +187,35 @@ class _VariantScreenState extends State<VariantScreen> {
                       background: ProductImageGallery(
                         images: variant.images,
                         pageController: _pageController,
-                        fixUrl: VariantUtils.fixImageUrl, // Usamos la utilidad
+                        fixUrl: VariantUtils.fixImageUrl,
                       ),
                     ),
                   ),
 
-                  // Cuerpo con Detalles (Refactorizado)
+                  // Cuerpo con Detalles (Usando nuestro widget separado)
                   SliverToBoxAdapter(
                     child: VariantInfoBody(
+                      // Datos Básicos
                       brandName: data.brand.toUpperCase(),
                       sku: variant.sku,
                       productName: data.name,
                       price: variant.price,
-                      currentDisplayedStock: currentDisplayedStock,
                       description: data.description,
-                      data: data,
-                      variant: variant,
+
+                      // Datos de Stock y Variantes
+                      currentDisplayedStock: currentStock, // ✅ CORREGIDO
+                      data: data, // ✅ AGREGADO
+                      variant: variant, // ✅ AGREGADO
+                      variants: data.variants, // Lista completa para el color
+
+                      // Lógica de Estado y Callbacks
+                      quantity: _quantity,
+                      onIncrement: () => _incrementQuantity(variant.stock),
+                      onDecrement: _decrementQuantity,
+
                       onVariantSelected: (id) {
                         controller.changeVariant(id);
-                        setState(() => _quantity = 1);
-                      },
-                      quantity: _quantity,
-                      onIncrement: () {
-                        if (_quantity < variant.stock) {
-                          setState(() => _quantity++);
-                        }
-                      },
-                      onDecrement: () {
-                        if (_quantity > 1) {
-                          setState(() => _quantity--);
-                        }
+                        setState(() => _quantity = 1); // Reset al cambiar color
                       },
                       onAddToCart: () => _handleAddToCart(variant, data.name),
                       isAddingToCart: _isAddingToCart,
@@ -210,7 +230,6 @@ class _VariantScreenState extends State<VariantScreen> {
     );
   }
 
-  // Widget auxiliar para el ícono del carrito
   Widget _buildCartIconWithBadge() {
     return Stack(
       children: [

@@ -47,9 +47,8 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
                   side: const BorderSide(color: Colors.transparent),
                   labelStyle: AppTexts.body2M.copyWith(
                     color: isSelected ? AppColors.primaryS : AppColors.darkT,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                   onSelected: (bool selected) {
                     setState(() {
@@ -82,11 +81,10 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
             padding: const EdgeInsets.only(bottom: 15.0),
             child: Row(
               children: widget.brands.map((brand) {
-                // 🔥 CORRECCIÓN CRÍTICA: Manejo seguro de ID y Nombre
+                // Manejo seguro de ID y Nombre
                 final dynamic rawId = (brand is Map) ? brand['id'] : brand.id;
-                final dynamic rawName = (brand is Map)
-                    ? brand['name']
-                    : brand.name;
+                final dynamic rawName =
+                    (brand is Map) ? brand['name'] : brand.name;
 
                 final int brandId = int.tryParse(rawId.toString()) ?? 0;
                 final String brandName = rawName?.toString() ?? "General";
@@ -99,19 +97,28 @@ class _CategoryFilterWState extends State<CategoryFilterW> {
                     label: Text(brandName),
                     selected: isSelected,
                     showCheckmark: false,
-                    selectedColor: const Color(0xFFE0E0E0),
-                    backgroundColor: Colors.white,
+
+                    // 🔥 AQUÍ ESTÁ EL CAMBIO DE ESTILO PARA MARCAS 🔥
+                    // Usamos los mismos colores que en Categorías
+                    selectedColor: AppColors
+                        .secondaryP, // Fondo seleccionado (Morado claro)
+                    backgroundColor:
+                        Colors.white, // Fondo no seleccionado (Blanco)
+
+                    // Borde: Transparente si está seleccionado, Gris suave si no
                     side: BorderSide(
                       color: isSelected
                           ? Colors.transparent
                           : Colors.grey.shade300,
                     ),
+
+                    // Texto: Morado si está seleccionado, Gris/Negro si no
                     labelStyle: AppTexts.body2M.copyWith(
-                      color: isSelected ? Colors.black : Colors.grey,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      color: isSelected ? AppColors.primaryS : AppColors.darkT,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
+
                     onSelected: (bool selected) {
                       setState(() {
                         _selectedBrandId = selected ? brandId : null;
