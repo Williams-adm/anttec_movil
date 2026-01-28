@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
-import 'cart_constants.dart';
+import 'package:anttec_movil/app/core/styles/colors.dart'; // Asegúrate de importar tus colores
 
-class CartItemCard extends StatelessWidget {
+class CartItemCard extends StatefulWidget {
   final dynamic item;
   final CartProvider provider;
 
@@ -12,6 +12,35 @@ class CartItemCard extends StatelessWidget {
     required this.item,
     required this.provider,
   });
+
+  @override
+  State<CartItemCard> createState() => _CartItemCardState();
+}
+
+class _CartItemCardState extends State<CartItemCard> {
+  late int _currentQuantity;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentQuantity = widget.item.quantity;
+  }
+
+  @override
+  void didUpdateWidget(covariant CartItemCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item.quantity != oldWidget.item.quantity) {
+      _currentQuantity = widget.item.quantity;
+    }
+  }
+
+  void _updateQuantity(int newQuantity) {
+    setState(() {
+      _currentQuantity = newQuantity;
+    });
+    // Enviamos 'variantId' (1) en lugar de 'id' (9)
+    widget.provider.updateItem(widget.item.variantId, newQuantity);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,47 +59,43 @@ class CartItemCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Fila Superior: Nombre y Eliminar
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Text(
-                  item.name,
+                  widget.item.name,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: AppColors.textDark,
-                  ),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: AppColors
+                          .extradarkT), // Corregido el nombre del color
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               InkWell(
-                onTap: () => provider.removeItem(item.id!),
+                onTap: () => widget.provider.removeItem(widget.item.id),
                 child: const Padding(
                   padding: EdgeInsets.only(left: 8.0, bottom: 8.0),
                   child: Icon(Icons.delete_outline,
-                      color: AppColors.deleteRed, size: 26),
+                      color: Colors.red,
+                      size: 26), // Usamos Colors.red o tu color de borrar
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-
-          // Fila Inferior: Imagen y Controles
           Row(
             children: [
-              // Imagen
               Container(
                 width: 100,
                 height: 80,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white,
-                ),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white),
                 child: CachedNetworkImage(
-                  imageUrl: item.image ?? "",
+                  imageUrl: widget.item.image ?? "",
                   fit: BoxFit.contain,
                   placeholder: (_, __) =>
                       const Icon(Icons.image, color: Colors.grey),
@@ -79,8 +104,6 @@ class CartItemCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 15),
-
-              // Datos y Botones
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,12 +111,12 @@ class CartItemCard extends StatelessWidget {
                     RichText(
                       text: TextSpan(
                         style: const TextStyle(
-                            color: AppColors.textDark, fontSize: 16),
+                            color: AppColors.extradarkT, fontSize: 16),
                         children: [
                           const TextSpan(
-                              text: 'Precio  ',
+                              text: 'Precio   ',
                               style: TextStyle(fontWeight: FontWeight.bold)),
-                          TextSpan(text: 'S/. ${item.price}'),
+                          TextSpan(text: 'S/. ${widget.item.price}'),
                         ],
                       ),
                     ),
@@ -105,20 +128,19 @@ class CartItemCard extends StatelessWidget {
                     Row(
                       children: [
                         _qtyButton(Icons.remove, () {
-                          if (item.quantity > 1) {
-                            provider.updateItem(item.id!, item.quantity - 1);
+                          // ✅ LLAVES AGREGADAS AQUÍ
+                          if (_currentQuantity > 1) {
+                            _updateQuantity(_currentQuantity - 1);
                           }
                         }),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 15),
-                          child: Text(
-                            '${item.quantity}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 18),
-                          ),
+                          child: Text('$_currentQuantity',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 18)),
                         ),
                         _qtyButton(Icons.add, () {
-                          provider.updateItem(item.id!, item.quantity + 1);
+                          _updateQuantity(_currentQuantity + 1);
                         }),
                       ],
                     ),
@@ -133,16 +155,16 @@ class CartItemCard extends StatelessWidget {
   }
 
   Widget _qtyButton(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: AppColors.tertiaryS, // Usando tu color secundario claro
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: AppColors.qtyBackground,
-          borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 20, color: AppColors.extradarkT),
         ),
-        child: Icon(icon, size: 20, color: AppColors.textDark),
       ),
     );
   }

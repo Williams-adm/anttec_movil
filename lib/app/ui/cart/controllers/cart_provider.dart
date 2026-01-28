@@ -15,20 +15,22 @@ class CartProvider extends ChangeNotifier {
 
   String? errorMessage;
 
-  // Calculamos el total sumando (precio * cantidad) de cada ítem
   double get totalAmount {
     return _items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
   }
 
-  // Total de artículos (suma de cantidades) para el badge del ícono
   int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
 
   // ===========================================================================
-  // 📥 OBTENER CARRITO
+  // 📥 OBTENER CARRITO (MODIFICADO: MODO SILENCIOSO)
   // ===========================================================================
-  Future<void> fetchCart() async {
-    _isLoading = true;
-    notifyListeners();
+  // Agregamos 'silent' para no bloquear la pantalla al actualizar
+  Future<void> fetchCart({bool silent = false}) async {
+    if (!silent) {
+      _isLoading = true;
+      notifyListeners();
+    }
+
     try {
       _items = await _cartRepository.getCart();
       errorMessage = null;
@@ -36,8 +38,10 @@ class CartProvider extends ChangeNotifier {
       errorMessage = e.toString();
       _items = [];
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!silent) {
+        _isLoading = false;
+      }
+      notifyListeners(); // Siempre notificamos al final para actualizar precios
     }
   }
 
@@ -55,7 +59,8 @@ class CartProvider extends ChangeNotifier {
         variantId: variantId,
         quantity: quantity,
       );
-      await fetchCart(); // Recargamos para actualizar el badge y la lista
+      // Aquí sí queremos loading porque el usuario viene de otra pantalla
+      await fetchCart(silent: false);
       return true;
     } catch (e) {
       errorMessage = e.toString();
@@ -65,19 +70,20 @@ class CartProvider extends ChangeNotifier {
   }
 
   // ===========================================================================
-  // 🔄 ACTUALIZAR CANTIDAD (¡ESTA ES LA QUE FALTABA!)
+  // 🔄 ACTUALIZAR CANTIDAD (CORREGIDO PARA NO PARPADEAR)
   // ===========================================================================
-  Future<void> updateItem(int itemId, int quantity) async {
+  Future<void> updateItem(int variantId, int quantity) async {
     try {
-      // 1. Llamamos al repositorio para que hable con la API
-      await _cartRepository.updateItem(itemId, quantity);
+      // 1. Llamada a la API
+      await _cartRepository.updateItem(variantId, quantity);
 
-      // 2. Recargamos la lista para ver el nuevo total y cantidad
-      await fetchCart();
+      // 2. Refrescamos la lista en MODO SILENCIOSO (silent: true)
+      // Esto actualiza los totales sin poner la pantalla en blanco.
+      await fetchCart(silent: true);
     } catch (e) {
       debugPrint("Error actualizando item: $e");
-      errorMessage = "No se pudo actualizar la cantidad";
-      notifyListeners();
+      // Si falla, recargamos normal para revertir visualmente
+      await fetchCart(silent: true);
     }
   }
 
@@ -87,11 +93,9 @@ class CartProvider extends ChangeNotifier {
   Future<void> removeItem(int itemId) async {
     try {
       await _cartRepository.removeItem(itemId);
-      await fetchCart(); // Recargamos la lista tras borrar
+      await fetchCart(); // Al eliminar sí está bien que cargue un momento
     } catch (e) {
       debugPrint("Error eliminando item: $e");
-      errorMessage = "No se pudo eliminar el producto";
-      notifyListeners();
     }
   }
 
@@ -105,8 +109,6 @@ class CartProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint("Error vaciando carrito: $e");
-      errorMessage = "Error al vaciar el carrito";
-      notifyListeners();
     }
   }
 }

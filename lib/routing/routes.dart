@@ -4,8 +4,13 @@ abstract final class Routes {
   static const home = '/home';
   static const scan = '/scan';
   static const cart = '/cart';
+
+  // ✅ Puedes usar esta que ya tienes o agregar 'checkout' abajo
   static const finalizarVenta = '/finalizar-venta';
 
-  // 🔥 NUEVA: Ruta relativa (sin slash al inicio) para usar dentro del Home
+  // Agrega esta si quieres seguir el nombre que usamos en el código anterior:
+  static const checkout = '/checkout';
+
+  // 🔥 NUEVA: Ruta relativa
   static const productDetail = '/producto/:sku';
 }

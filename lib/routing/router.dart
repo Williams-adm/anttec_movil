@@ -12,11 +12,16 @@ import 'package:anttec_movil/app/ui/home/screen/home_screen.dart';
 // Layouts
 import 'package:anttec_movil/app/ui/layout/screen/layout_screen.dart';
 import 'package:anttec_movil/app/ui/layout/screen/layout_home_screen.dart';
-// import 'package:anttec_movil/app/ui/layout/screen/layout_pages_screen.dart'; // YA NO LO NECESITAMOS AQUÍ
 
 import 'package:anttec_movil/app/ui/scan/screen/scan_screen.dart';
 import 'package:anttec_movil/app/ui/cart/screen/cart_screen.dart';
-import 'package:anttec_movil/app/ui/sales/finalizar_venta_page.dart';
+
+// ❌ BORRA O COMENTA ESTA LÍNEA (La pantalla vieja)
+// import 'package:anttec_movil/app/ui/sales/finalizar_venta_page.dart';
+
+// ✅ AGREGA ESTA LÍNEA (La nueva pantalla)
+import 'package:anttec_movil/app/ui/checkout/checkout_screen.dart';
+
 import 'package:anttec_movil/app/ui/variants/screen/variant_screen.dart';
 import 'package:anttec_movil/app/ui/chat/screen/chat_screen.dart';
 
@@ -71,16 +76,16 @@ GoRouter router() => GoRouter(
           },
         ),
 
-        // ✅ FINALIZAR VENTA
+        // ✅ FINALIZAR VENTA (CHECKOUT) - ACTUALIZADO
         GoRoute(
-          path: Routes.finalizarVenta,
-          name: 'finalizar-venta',
+          path: '/checkout', // Puedes usar Routes.checkout si lo agregaste
+          name:
+              'checkout', // ⚠️ IMPORTANTE: Este nombre coincide con cart_screen.dart
           parentNavigatorKey: _rootNavigatorKey,
-          builder: (context, state) => const FinalizarVentaPage(),
+          builder: (context, state) => const CheckoutScreen(),
         ),
 
-        // ✅ SCANNER (MOVIDO AQUÍ - PANTALLA COMPLETA)
-        // Al estar aquí arriba, ignora el LayoutPagesScreen y el menú inferior.
+        // ✅ SCANNER
         GoRoute(
           path: Routes.scan,
           name: 'scan',
@@ -113,8 +118,6 @@ GoRouter router() => GoRouter(
               name: 'cart',
               builder: (context, state) => const CartScreen(),
             ),
-
-            // ❌ EL BLOQUE 'LAYOUT PAGES' FUE ELIMINADO PORQUE EL SCAN SUBIÓ
           ],
         ),
       ],
