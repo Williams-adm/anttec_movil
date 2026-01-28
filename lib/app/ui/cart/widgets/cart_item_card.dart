@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
-import 'package:anttec_movil/app/core/styles/colors.dart'; // Asegúrate de importar tus colores
+import 'package:anttec_movil/app/core/styles/colors.dart';
 
 class CartItemCard extends StatefulWidget {
   final dynamic item;
@@ -35,15 +35,38 @@ class _CartItemCardState extends State<CartItemCard> {
   }
 
   void _updateQuantity(int newQuantity) {
+    // ✅ VALIDACIÓN DE STOCK
+    if (newQuantity > widget.item.maxStock) {
+      _showStockLimitMessage();
+      return;
+    }
+
     setState(() {
       _currentQuantity = newQuantity;
     });
-    // Enviamos 'variantId' (1) en lugar de 'id' (9)
     widget.provider.updateItem(widget.item.variantId, newQuantity);
+  }
+
+  // ✅ MENSAJE DE ADVERTENCIA
+  void _showStockLimitMessage() {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "Stock máximo alcanzado (${widget.item.maxStock} unidades)",
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: AppColors.primaryP,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Verificamos si podemos seguir sumando
+    final bool canIncrease = _currentQuantity < widget.item.maxStock;
+
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -68,8 +91,7 @@ class _CartItemCardState extends State<CartItemCard> {
                   style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
-                      color: AppColors
-                          .extradarkT), // Corregido el nombre del color
+                      color: AppColors.extradarkT),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -78,9 +100,8 @@ class _CartItemCardState extends State<CartItemCard> {
                 onTap: () => widget.provider.removeItem(widget.item.id),
                 child: const Padding(
                   padding: EdgeInsets.only(left: 8.0, bottom: 8.0),
-                  child: Icon(Icons.delete_outline,
-                      color: Colors.red,
-                      size: 26), // Usamos Colors.red o tu color de borrar
+                  child:
+                      Icon(Icons.delete_outline, color: Colors.red, size: 26),
                 ),
               ),
             ],
@@ -128,7 +149,6 @@ class _CartItemCardState extends State<CartItemCard> {
                     Row(
                       children: [
                         _qtyButton(Icons.remove, () {
-                          // ✅ LLAVES AGREGADAS AQUÍ
                           if (_currentQuantity > 1) {
                             _updateQuantity(_currentQuantity - 1);
                           }
@@ -139,9 +159,18 @@ class _CartItemCardState extends State<CartItemCard> {
                               style: const TextStyle(
                                   fontWeight: FontWeight.w600, fontSize: 18)),
                         ),
-                        _qtyButton(Icons.add, () {
-                          _updateQuantity(_currentQuantity + 1);
-                        }),
+                        // ✅ BOTÓN SUMAR CON LÓGICA DE STOCK
+                        _qtyButton(
+                          Icons.add,
+                          () {
+                            if (canIncrease) {
+                              _updateQuantity(_currentQuantity + 1);
+                            } else {
+                              _showStockLimitMessage();
+                            }
+                          },
+                          isEnabled: canIncrease,
+                        ),
                       ],
                     ),
                   ],
@@ -154,16 +183,24 @@ class _CartItemCardState extends State<CartItemCard> {
     );
   }
 
-  Widget _qtyButton(IconData icon, VoidCallback onTap) {
+  // ✅ WIDGET DE BOTÓN MEJORADO
+  Widget _qtyButton(IconData icon, VoidCallback onTap,
+      {bool isEnabled = true}) {
     return Material(
-      color: AppColors.tertiaryS, // Usando tu color secundario claro
+      color: isEnabled
+          ? AppColors.tertiaryS
+          : AppColors.secondaryS.withValues(alpha: 0.5),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        onTap: onTap,
+        onTap: isEnabled ? onTap : null,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.all(6),
-          child: Icon(icon, size: 20, color: AppColors.extradarkT),
+          child: Icon(
+            icon,
+            size: 20,
+            color: isEnabled ? AppColors.extradarkT : Colors.grey,
+          ),
         ),
       ),
     );
