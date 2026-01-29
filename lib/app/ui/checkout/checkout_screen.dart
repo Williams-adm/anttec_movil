@@ -10,7 +10,7 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  String? _selectedType; // 'boleta' o 'factura'
+  String? _selectedType; // Guarda 'boleta' o 'factura'
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +129,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         child: Row(
           children: [
-            // Icono con contenedor estilizado
+            // Contenedor del Icono
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               padding: const EdgeInsets.all(14),
@@ -144,7 +144,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
             const SizedBox(width: 20),
-            // Textos
+            // Textos descriptivos
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,7 +170,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ],
               ),
             ),
-            // Indicador de selección
+            // Radio Indicator
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               child: Icon(
@@ -210,8 +210,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: ElevatedButton(
           onPressed: isReady
               ? () {
-                  // Acción según selección
-                  debugPrint("Continuar con: $_selectedType");
+                  // ✅ Navegación dinámica según selección
+                  if (_selectedType == 'boleta') {
+                    context.push('/boleta');
+                  } else if (_selectedType == 'factura') {
+                    context.push('/factura');
+                  }
                 }
               : null,
           style: ElevatedButton.styleFrom(

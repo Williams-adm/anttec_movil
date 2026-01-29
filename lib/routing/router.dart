@@ -16,11 +16,10 @@ import 'package:anttec_movil/app/ui/layout/screen/layout_home_screen.dart';
 import 'package:anttec_movil/app/ui/scan/screen/scan_screen.dart';
 import 'package:anttec_movil/app/ui/cart/screen/cart_screen.dart';
 
-// ❌ BORRA O COMENTA ESTA LÍNEA (La pantalla vieja)
-// import 'package:anttec_movil/app/ui/sales/finalizar_venta_page.dart';
-
-// ✅ AGREGA ESTA LÍNEA (La nueva pantalla)
+// Pantallas de Checkout
 import 'package:anttec_movil/app/ui/checkout/checkout_screen.dart';
+import 'package:anttec_movil/app/ui/checkout/boleta/boleta_screen.dart'; // ✅ Importada
+import 'package:anttec_movil/app/ui/checkout/factura/factura_screen.dart'; // ✅ Importada
 
 import 'package:anttec_movil/app/ui/variants/screen/variant_screen.dart';
 import 'package:anttec_movil/app/ui/chat/screen/chat_screen.dart';
@@ -76,13 +75,28 @@ GoRouter router() => GoRouter(
           },
         ),
 
-        // ✅ FINALIZAR VENTA (CHECKOUT) - ACTUALIZADO
+        // ✅ FINALIZAR VENTA (SELECTOR)
         GoRoute(
-          path: '/checkout', // Puedes usar Routes.checkout si lo agregaste
-          name:
-              'checkout', // ⚠️ IMPORTANTE: Este nombre coincide con cart_screen.dart
+          path: '/checkout',
+          name: 'checkout',
           parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) => const CheckoutScreen(),
+        ),
+
+        // ✅ RUTA ESPECÍFICA BOLETA
+        GoRoute(
+          path: '/boleta',
+          name: 'boleta',
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => const BoletaScreen(),
+        ),
+
+        // ✅ RUTA ESPECÍFICA FACTURA
+        GoRoute(
+          path: '/factura',
+          name: 'factura',
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => const FacturaScreen(),
         ),
 
         // ✅ SCANNER
@@ -99,7 +113,6 @@ GoRouter router() => GoRouter(
         ShellRoute(
           builder: (context, state, child) => LayoutScreen(content: child),
           routes: [
-            // PESTAÑA INICIO
             ShellRoute(
               builder: (context, state, child) =>
                   LayoutHomeScreen(content: child),
@@ -111,8 +124,6 @@ GoRouter router() => GoRouter(
                 ),
               ],
             ),
-
-            // PESTAÑA CARRITO
             GoRoute(
               path: Routes.cart,
               name: 'cart',
