@@ -18,8 +18,11 @@ import 'package:anttec_movil/app/ui/cart/screen/cart_screen.dart';
 
 // Pantallas de Checkout
 import 'package:anttec_movil/app/ui/checkout/checkout_screen.dart';
-import 'package:anttec_movil/app/ui/checkout/boleta/boleta_screen.dart'; // ✅ Importada
-import 'package:anttec_movil/app/ui/checkout/factura/factura_screen.dart'; // ✅ Importada
+import 'package:anttec_movil/app/ui/checkout/boleta/boleta_screen.dart';
+import 'package:anttec_movil/app/ui/checkout/factura/factura_screen.dart';
+
+// ✅ NUEVA PANTALLA DE REPORTES
+import 'package:anttec_movil/app/ui/sales_report/screen/sales_report_screen.dart';
 
 import 'package:anttec_movil/app/ui/variants/screen/variant_screen.dart';
 import 'package:anttec_movil/app/ui/chat/screen/chat_screen.dart';
@@ -37,7 +40,7 @@ GoRouter router() => GoRouter(
         GoRoute(
           path: Routes.splash,
           name: 'splash',
-          builder: (context, state) => SplashScreen(),
+          builder: (context, state) => const SplashScreen(),
         ),
         GoRoute(
           path: Routes.login,
@@ -53,7 +56,7 @@ GoRouter router() => GoRouter(
           builder: (context, state) => const ChatScreen(),
         ),
 
-        // ✅ PRODUCTO
+        // PRODUCTO
         GoRoute(
           path: '/producto/:sku',
           name: 'product_detail',
@@ -75,7 +78,7 @@ GoRouter router() => GoRouter(
           },
         ),
 
-        // ✅ FINALIZAR VENTA (SELECTOR)
+        // FINALIZAR VENTA (SELECTOR)
         GoRoute(
           path: '/checkout',
           name: 'checkout',
@@ -83,7 +86,7 @@ GoRouter router() => GoRouter(
           builder: (context, state) => const CheckoutScreen(),
         ),
 
-        // ✅ RUTA ESPECÍFICA BOLETA
+        // RUTA ESPECÍFICA BOLETA
         GoRoute(
           path: '/boleta',
           name: 'boleta',
@@ -91,7 +94,7 @@ GoRouter router() => GoRouter(
           builder: (context, state) => const BoletaScreen(),
         ),
 
-        // ✅ RUTA ESPECÍFICA FACTURA
+        // RUTA ESPECÍFICA FACTURA
         GoRoute(
           path: '/factura',
           name: 'factura',
@@ -99,7 +102,7 @@ GoRouter router() => GoRouter(
           builder: (context, state) => const FacturaScreen(),
         ),
 
-        // ✅ SCANNER
+        // SCANNER
         GoRoute(
           path: Routes.scan,
           name: 'scan',
@@ -108,11 +111,12 @@ GoRouter router() => GoRouter(
         ),
 
         // ===========================================================
-        // 2. SHELL ROUTE (Pantallas con menú inferior)
+        // 2. SHELL ROUTE (Pantallas con menú inferior / FooterW)
         // ===========================================================
         ShellRoute(
           builder: (context, state, child) => LayoutScreen(content: child),
           routes: [
+            // Sub-Shell para Home (si mantienes LayoutHomeScreen)
             ShellRoute(
               builder: (context, state, child) =>
                   LayoutHomeScreen(content: child),
@@ -120,14 +124,23 @@ GoRouter router() => GoRouter(
                 GoRoute(
                   path: Routes.home,
                   name: 'home',
-                  builder: (context, state) => HomeScreen(),
+                  builder: (context, state) => const HomeScreen(),
                 ),
               ],
             ),
+
+            // Pantalla del Carrito
             GoRoute(
               path: Routes.cart,
               name: 'cart',
               builder: (context, state) => const CartScreen(),
+            ),
+
+            // ✅ RUTA DE REPORTES (HISTORIAL DE VENTAS)
+            GoRoute(
+              path: '/reports',
+              name: 'reports',
+              builder: (context, state) => const SalesReportScreen(),
             ),
           ],
         ),

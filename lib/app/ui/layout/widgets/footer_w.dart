@@ -8,7 +8,9 @@ class FooterW extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos la ruta actual para saber qué botón pintar de color
     final String? currentRouteName = GoRouterState.of(context).name;
+
     return Stack(
       alignment: Alignment.topCenter,
       clipBehavior: Clip.none,
@@ -25,28 +27,51 @@ class FooterW extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
+                  // 1. BOTÓN IZQUIERDO: HOME
                   IconButton(
                     onPressed: () {
                       if (currentRouteName != 'home') {
                         context.goNamed('home');
                       }
                     },
-                    icon: Icon(Symbols.home, size: 48.0),
+                    icon: Icon(
+                      Symbols.home,
+                      size: 48.0,
+                      // Si estamos en home, se pinta del color primario
+                      color: currentRouteName == 'home'
+                          ? AppColors.primaryP
+                          : Colors.black54,
+                    ),
                   ),
-                  const SizedBox(width: 90.0), // espacio para el botón central
+
+                  // ESPACIO PARA EL BOTÓN CENTRAL (SCANNER)
+                  const SizedBox(width: 90.0),
+
+                  // 2. BOTÓN DERECHO: AHORA ES REPORTES / HISTORIAL
                   IconButton(
                     onPressed: () {
-                      if (currentRouteName != 'sale') {
-                        context.goNamed('sale');
+                      // Navegamos a la nueva pantalla de reportes
+                      if (currentRouteName != 'reports') {
+                        context.goNamed('reports');
                       }
                     },
-                    icon: Icon(Symbols.order_approve, size: 48.0),
+                    // Cambiamos el icono a uno de analítica o lista
+                    icon: Icon(
+                      Symbols.analytics, // O puedes usar Symbols.receipt_long
+                      size: 48.0,
+                      // Si estamos en reports, se pinta del color primario
+                      color: currentRouteName == 'reports'
+                          ? AppColors.primaryP
+                          : Colors.black54,
+                    ),
                   ),
                 ],
               ),
             ),
           ],
         ),
+
+        // BOTÓN FLOTANTE: SCANNER (Se mantiene igual)
         Positioned(
           top: -20,
           child: ElevatedButton(
@@ -57,8 +82,8 @@ class FooterW extends StatelessWidget {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryP,
-              padding: EdgeInsets.all(12.0),
-              shape: CircleBorder(),
+              padding: const EdgeInsets.all(12.0),
+              shape: const CircleBorder(),
             ),
             child: Icon(
               Symbols.barcode_scanner,

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart'; // ✅ Necesario para debugPrint
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
@@ -13,12 +13,14 @@ import 'package:anttec_movil/data/services/api/v1/category_service.dart';
 import 'package:anttec_movil/data/repositories/category/category_repository.dart';
 import 'package:anttec_movil/data/repositories/category/category_repository_remote.dart';
 
-// Importar el nuevo Repositorio de Carrito
 import 'package:anttec_movil/app/ui/cart/repositories/cart_repository.dart';
 
 // --- VIEWMODELS Y PROVIDERS (UI LAYER) ---
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:anttec_movil/app/ui/layout/view_models/layout_home_viewmodel.dart';
+
+// ✅ 1. IMPORTAMOS EL NUEVO VIEWMODEL DE REPORTES
+import 'package:anttec_movil/app/ui/sales_report/viewmodel/sales_report_viewmodel.dart';
 
 List<SingleChildWidget> get providersRemote {
   return [
@@ -28,9 +30,7 @@ List<SingleChildWidget> get providersRemote {
     Provider<Dio>(
       create: (_) {
         final dio = Dio(BaseOptions(
-          // ✅ URL DE PRODUCCIÓN (La que funciona en la nube)
           baseUrl: 'https://anttec-back-master-gicfjw.laravel.cloud/api/v1',
-
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
           headers: {
@@ -39,13 +39,11 @@ List<SingleChildWidget> get providersRemote {
           },
         ));
 
-        // 🔥 INTERCEPTOR
         dio.interceptors
             .add(InterceptorsWrapper(onRequest: (options, handler) async {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token');
 
-          // ✅ CORREGIDO: Usamos debugPrint en lugar de print
           if (kDebugMode) {
             debugPrint(
                 "🔑 Token en interceptor: ${token != null ? 'Presente' : 'Nulo'}");
@@ -56,7 +54,6 @@ List<SingleChildWidget> get providersRemote {
           }
           return handler.next(options);
         }, onError: (DioException e, handler) {
-          // ✅ CORREGIDO: Usamos debugPrint en lugar de print
           if (kDebugMode) {
             debugPrint(
                 "❌ Error DIO Global: ${e.response?.statusCode} - ${e.message}");
@@ -93,12 +90,12 @@ List<SingleChildWidget> get providersRemote {
     // 3. Providers de UI
     // =============================================================
 
-    // ✅ Carrito
+    // Carrito
     ChangeNotifierProvider<CartProvider>(
       create: (context) => CartProvider(context.read<CartRepository>()),
     ),
 
-    // ✅ ViewModel Global del Home
+    // ViewModel Global del Home
     ChangeNotifierProvider<LayoutHomeViewmodel>(
       create: (context) => LayoutHomeViewmodel(
         authRepository: context.read<AuthRepository>(),
@@ -106,6 +103,11 @@ List<SingleChildWidget> get providersRemote {
       )
         ..loadProfile()
         ..loadCategories(),
+    ),
+
+    // ✅ 2. AGREGAMOS EL PROVIDER DE REPORTES AQUÍ
+    ChangeNotifierProvider<SalesReportViewmodel>(
+      create: (_) => SalesReportViewmodel(),
     ),
   ];
 }
