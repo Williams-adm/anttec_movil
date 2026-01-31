@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
-// Imports de tu proyecto
 import 'package:anttec_movil/app/ui/auth/login/view_models/login_viewmodel.dart';
 import 'package:anttec_movil/app/ui/auth/login/styles/login_styles.dart';
 import 'package:anttec_movil/app/ui/auth/login/widgets/email_input_w.dart';
@@ -21,22 +20,27 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
-  // Controladores
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
-  // Bandera para evitar sobrescribir lo que escribe el usuario
   bool _initialDataLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    // 1. Escuchar cambios del ViewModel (cuando termine de cargar credenciales)
     widget.viewModel.addListener(_viewModelListener);
-
-    // 2. Intentar llenar inmediatamente (por si los datos ya estaban cargados en el ViewModel)
     _populateControllers();
+
+    // 🚀 EFECTO YAPE: Salta si ya está vinculado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAutoBiometric();
+    });
+  }
+
+  Future<void> _checkAutoBiometric() async {
+    if (widget.viewModel.rememberMe && widget.viewModel.savedEmail.isNotEmpty) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      _handleBiometricLogin(isAuto: true);
+    }
   }
 
   @override
@@ -48,42 +52,40 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _viewModelListener() {
-    // Manejo de errores de Login
     if (widget.viewModel.errorMessage != null && mounted) {
       ErrorDialogW.show(context, widget.viewModel.errorMessage!);
       widget.viewModel.clearErrorMessage();
     }
-
-    // Cada vez que el ViewModel notifique (ej: terminó de leer SharedPreferences), intentamos llenar
     _populateControllers();
   }
 
-  // 🔥 LÓGICA DE RECUÉRDAME (SharedPreferences)
   void _populateControllers() {
-    // Si NO hemos llenado los datos aún Y el ViewModel tiene un email guardado...
     if (!_initialDataLoaded && widget.viewModel.savedEmail.isNotEmpty) {
-      debugPrint(
-          "📝 UI: Escribiendo datos recuperados en los inputs: ${widget.viewModel.savedEmail}");
+      _emailController.text = widget.viewModel.savedEmail;
+      _initialDataLoaded = true;
+      if (mounted) setState(() {});
+    }
+  }
 
+  Future<void> _handleBiometricLogin({bool isAuto = false}) async {
+    if (!isAuto && widget.viewModel.savedEmail.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Ingresa tu clave y vincula tu huella primero.")),
+      );
+      return;
+    }
+
+    final success = await widget.viewModel.authenticate();
+    if (success && mounted) {
       _emailController.text = widget.viewModel.savedEmail;
       _passwordController.text = widget.viewModel.savedPassword;
-
-      _initialDataLoaded = true;
-
-      // Forzamos actualización visual para que el texto aparezca inmediatamente
-      if (mounted) setState(() {});
+      _handleLogin();
     }
   }
 
   Future<void> _handleLogin() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    // ⚠️ IMPORTANTE PARA GOOGLE AUTOFILL:
-    // NO ocultes el teclado (unfocus) todavía. Si quitas el foco, Android
-    // puede pensar que cancelaste el llenado del formulario.
-    // FocusScope.of(context).unfocus();
-
-    // Guardamos el estado actual del formulario
     _formKey.currentState?.save();
 
     final success = await widget.viewModel.login(
@@ -92,12 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      debugPrint("🚀 Login exitoso. Disparando Autofill Save...");
-
-      // 🔥 ORDEN EXPLÍCITA A ANDROID: "Login exitoso, guarda estos datos"
       TextInput.finishAutofillContext(shouldSave: true);
-
-      // Navegar al Home
       context.goNamed('home');
     }
   }
@@ -115,7 +112,6 @@ class _LoginScreenState extends State<LoginScreen> {
               return Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  // 🔥 AutofillGroup conecta Email + Password para Google
                   child: AutofillGroup(
                     child: Form(
                       key: _formKey,
@@ -124,24 +120,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Título
-                            Text(
-                              "Iniciar Sesión",
-                              textAlign: TextAlign.center,
-                              style: LoginStyles.pageTitle,
-                            ),
-
+                            Text("Iniciar Sesión",
+                                textAlign: TextAlign.center,
+                                style: LoginStyles.pageTitle),
                             const SizedBox(height: 30),
-
-                            // Campo Email
                             const LoginInputLabel("Correo Electrónico"),
                             LoginInputContainer(
-                              child: EmailInputW(controller: _emailController),
-                            ),
-
+                                child:
+                                    EmailInputW(controller: _emailController)),
                             const SizedBox(height: 20),
-
-                            // Campo Password
                             const LoginInputLabel("Contraseña"),
                             LoginInputContainer(
                               child: PasswordInputW(
@@ -149,22 +136,27 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onFieldSubmitted: _handleLogin,
                               ),
                             ),
-
-                            const SizedBox(height: 20),
-
-                            // Checkbox Recuérdame
+                            const SizedBox(height: 10),
+                            // ✅ CORREGIDO: Eliminamos el operador ?? redundante
                             LoginRememberMe(
                               value: widget.viewModel.rememberMe,
                               onChanged: (val) =>
                                   widget.viewModel.toggleRememberMe(val),
                             ),
-
                             const SizedBox(height: 25),
-
-                            // Botón Ingresar
-                            LoginButton(
-                              isLoading: widget.viewModel.isLoading,
-                              onPressed: _handleLogin,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: LoginButton(
+                                    isLoading: widget.viewModel.isLoading,
+                                    onPressed: _handleLogin,
+                                  ),
+                                ),
+                                if (widget.viewModel.canCheckBiometrics) ...[
+                                  const SizedBox(width: 12),
+                                  _buildFingerprintButton(),
+                                ]
+                              ],
                             ),
                           ],
                         ),
@@ -175,6 +167,27 @@ class _LoginScreenState extends State<LoginScreen> {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFingerprintButton() {
+    return Material(
+      color: LoginStyles.buttonColor.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => _handleBiometricLogin(isAuto: false),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: LoginStyles.buttonColor.withValues(alpha: 0.5)),
+          ),
+          child: const Icon(Icons.fingerprint,
+              color: LoginStyles.buttonColor, size: 32),
         ),
       ),
     );
