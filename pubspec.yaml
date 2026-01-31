@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.5.4 # Ajustado a un rango más común, pero usa el que tenías si te funciona (3.8.1)
+  sdk: ^3.5.4 
 
 dependencies:
   flutter:
@@ -13,11 +13,11 @@ dependencies:
 
   # --- 🧠 INTELIGENCIA ARTIFICIAL ---
   langchain: ^0.8.0
-  langchain_mistralai: ^0.3.1+1  # ✅ La versión que SÍ compila
+  langchain_mistralai: ^0.3.1+1
 
   # --- 🎨 DISEÑO Y FORMATO ---
-  flutter_markdown: ^0.7.1       # ✅ Vital para ver negritas y listas
-  flutter_spinkit: ^5.2.1        # ✅ Animación de carga bonita
+  flutter_markdown: ^0.7.1
+  flutter_spinkit: ^5.2.1
   cupertino_icons: ^1.0.8
   material_symbols_icons: ^4.2872.1
   cached_network_image: ^3.3.1
@@ -35,6 +35,22 @@ dependencies:
   # --- 🛠 UTILIDADES ---
   form_field_validator: ^1.1.0
   mobile_scanner: ^6.0.2
+
+  # --- 🖨️ IMPRESIÓN Y PERIFÉRICOS (MÓDULO VENTAS) ---
+  # Genera los comandos ESC/POS (negritas, cortes, texto)
+  esc_pos_utils_plus: ^2.0.3 
+  
+  # Necesario para procesar imágenes internamente
+  image: ^4.0.17
+  
+  # Para manejar la impresora Bluetooth (Versión estable)
+  print_bluetooth_thermal: ^1.1.9
+  
+  # Para pedir permisos en tiempo de ejecución
+  permission_handler: ^11.3.0
+
+  # ✅ VITAL: Para escanear la red WiFi y encontrar ticketeras IP
+  network_info_plus: ^5.0.3
 
 dev_dependencies:
   flutter_test:
