@@ -4,111 +4,85 @@ import 'package:anttec_movil/app/ui/cart/repositories/cart_repository.dart';
 
 class CartProvider extends ChangeNotifier {
   final CartRepository _cartRepository;
-
   CartProvider(this._cartRepository);
 
   List<CartItem> _items = [];
   List<CartItem> get items => _items;
-
   bool _isLoading = false;
   bool get isLoading => _isLoading;
-
   String? errorMessage;
 
-  double get totalAmount {
-    return _items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-  }
-
+  double get totalAmount =>
+      _items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
   int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
 
-  // ===========================================================================
-  // 📥 OBTENER CARRITO (MODIFICADO: MODO SILENCIOSO)
-  // ===========================================================================
-  // Agregamos 'silent' para no bloquear la pantalla al actualizar
   Future<void> fetchCart({bool silent = false}) async {
     if (!silent) {
       _isLoading = true;
       notifyListeners();
     }
-
     try {
-      _items = await _cartRepository.getCart();
+      final newItems = await _cartRepository.getCart();
+      if (newItems.isNotEmpty || _items.isEmpty) {
+        _items = newItems;
+      }
       errorMessage = null;
     } catch (e) {
       errorMessage = e.toString();
-      _items = [];
     } finally {
-      if (!silent) {
-        _isLoading = false;
-      }
-      notifyListeners(); // Siempre notificamos al final para actualizar precios
+      if (!silent) _isLoading = false;
+      notifyListeners();
     }
   }
 
-  // ===========================================================================
-  // ➕ AGREGAR ITEM
-  // ===========================================================================
-  Future<bool> addItem({
-    required int productId,
-    int? variantId,
-    required int quantity,
-  }) async {
+  Future<bool> addItem(
+      {required int productId, int? variantId, required int quantity}) async {
     try {
       await _cartRepository.addItem(
-        productId: productId,
-        variantId: variantId,
-        quantity: quantity,
-      );
-      // Aquí sí queremos loading porque el usuario viene de otra pantalla
+          productId: productId, variantId: variantId, quantity: quantity);
       await fetchCart(silent: false);
       return true;
     } catch (e) {
-      errorMessage = e.toString();
       notifyListeners();
       return false;
     }
   }
 
-  // ===========================================================================
-  // 🔄 ACTUALIZAR CANTIDAD (CORREGIDO PARA NO PARPADEAR)
-  // ===========================================================================
-  Future<void> updateItem(int variantId, int quantity) async {
-    try {
-      // 1. Llamada a la API
-      await _cartRepository.updateItem(variantId, quantity);
+  // ✅ REMOVE ITEM: Ahora usa variantId
+  Future<void> removeItem(CartItem item) async {
+    final backup = List<CartItem>.from(_items);
+    _items.removeWhere((i) => i.id == item.id); // Borrado visual
+    notifyListeners();
 
-      // 2. Refrescamos la lista en MODO SILENCIOSO (silent: true)
-      // Esto actualiza los totales sin poner la pantalla en blanco.
+    try {
+      // Pasamos variantId para el truco ninja
+      await _cartRepository.removeItem(item.variantId);
       await fetchCart(silent: true);
     } catch (e) {
-      debugPrint("Error actualizando item: $e");
-      // Si falla, recargamos normal para revertir visualmente
-      await fetchCart(silent: true);
+      debugPrint("❌ Error eliminando: $e");
+      _items = backup; // Restaurar si falla
+      notifyListeners();
     }
   }
 
-  // ===========================================================================
-  // 🗑️ ELIMINAR ITEM
-  // ===========================================================================
-  Future<void> removeItem(int itemId) async {
-    try {
-      await _cartRepository.removeItem(itemId);
-      await fetchCart(); // Al eliminar sí está bien que cargue un momento
-    } catch (e) {
-      debugPrint("Error eliminando item: $e");
-    }
-  }
-
-  // ===========================================================================
-  // 🧹 VACIAR CARRITO
-  // ===========================================================================
   Future<void> clearCart() async {
+    final backup = List<CartItem>.from(_items);
+    _items = [];
+    notifyListeners();
     try {
       await _cartRepository.clearCart();
-      _items = [];
-      notifyListeners();
     } catch (e) {
-      debugPrint("Error vaciando carrito: $e");
+      _items = backup;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateItem(int variantId, int quantity) async {
+    try {
+      await _cartRepository.updateItem(variantId, quantity);
+      await fetchCart(silent: true);
+    } catch (e) {
+      await fetchCart(silent: true);
     }
   }
 }

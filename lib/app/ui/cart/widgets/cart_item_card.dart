@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 class CartItemCard extends StatefulWidget {
   final dynamic item;
   final CartProvider provider;
 
-  const CartItemCard({
-    super.key,
-    required this.item,
-    required this.provider,
-  });
+  const CartItemCard({super.key, required this.item, required this.provider});
 
   @override
   State<CartItemCard> createState() => _CartItemCardState();
@@ -35,49 +32,32 @@ class _CartItemCardState extends State<CartItemCard> {
   }
 
   void _updateQuantity(int newQuantity) {
-    // ✅ VALIDACIÓN DE STOCK
     if (newQuantity > widget.item.maxStock) {
-      _showStockLimitMessage();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("Stock máximo: ${widget.item.maxStock}"),
+            backgroundColor: AppColors.primaryP),
+      );
       return;
     }
-
-    setState(() {
-      _currentQuantity = newQuantity;
-    });
+    setState(() => _currentQuantity = newQuantity);
     widget.provider.updateItem(widget.item.variantId, newQuantity);
-  }
-
-  // ✅ MENSAJE DE ADVERTENCIA
-  void _showStockLimitMessage() {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          "Stock máximo alcanzado (${widget.item.maxStock} unidades)",
-          style: const TextStyle(color: Colors.white),
-        ),
-        backgroundColor: AppColors.primaryP,
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Verificamos si podemos seguir sumando
     final bool canIncrease = _currentQuantity < widget.item.maxStock;
 
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4))
         ],
       ),
       child: Column(
@@ -85,94 +65,80 @@ class _CartItemCardState extends State<CartItemCard> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  widget.item.name,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: AppColors.extradarkT),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              InkWell(
-                onTap: () => widget.provider.removeItem(widget.item.id),
-                child: const Padding(
-                  padding: EdgeInsets.only(left: 8.0, bottom: 8.0),
-                  child:
-                      Icon(Icons.delete_outline, color: Colors.red, size: 26),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Container(
-                width: 100,
-                height: 80,
-                decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.white),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
                 child: CachedNetworkImage(
                   imageUrl: widget.item.image ?? "",
-                  fit: BoxFit.contain,
-                  placeholder: (_, __) =>
-                      const Icon(Icons.image, color: Colors.grey),
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
                   errorWidget: (_, __, ___) =>
-                      const Icon(Icons.broken_image, color: Colors.grey),
+                      const Icon(Symbols.broken_image, color: Colors.grey),
                 ),
               ),
-              const SizedBox(width: 15),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RichText(
-                      text: TextSpan(
+                    Text(
+                      widget.item.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: AppColors.extradarkT),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text("S/. ${widget.item.price}",
                         style: const TextStyle(
-                            color: AppColors.extradarkT, fontSize: 16),
-                        children: [
-                          const TextSpan(
-                              text: 'Precio   ',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          TextSpan(text: 'S/. ${widget.item.price}'),
-                        ],
-                      ),
+                            color: AppColors.primaryP,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15)),
+                  ],
+                ),
+              ),
+              // ✅ CAMBIO CLAVE: Pasamos el objeto item completo
+              IconButton(
+                icon: const Icon(Symbols.delete_rounded,
+                    color: Colors.redAccent, size: 24),
+                onPressed: () => widget.provider.removeItem(widget.item),
+              ),
+            ],
+          ),
+          const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1, color: Color(0xFFF5F5F5))),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Cantidad",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.grey)),
+              Container(
+                decoration: BoxDecoration(
+                    color: AppColors.primaryS,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    _qtyBtn(
+                        Symbols.remove_rounded,
+                        () => _currentQuantity > 1
+                            ? _updateQuantity(_currentQuantity - 1)
+                            : null),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('$_currentQuantity',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900, fontSize: 17)),
                     ),
-                    const SizedBox(height: 8),
-                    const Text('Cantidad',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _qtyButton(Icons.remove, () {
-                          if (_currentQuantity > 1) {
-                            _updateQuantity(_currentQuantity - 1);
-                          }
-                        }),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 15),
-                          child: Text('$_currentQuantity',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 18)),
-                        ),
-                        // ✅ BOTÓN SUMAR CON LÓGICA DE STOCK
-                        _qtyButton(
-                          Icons.add,
-                          () {
-                            if (canIncrease) {
-                              _updateQuantity(_currentQuantity + 1);
-                            } else {
-                              _showStockLimitMessage();
-                            }
-                          },
-                          isEnabled: canIncrease,
-                        ),
-                      ],
-                    ),
+                    _qtyBtn(
+                        Symbols.add_rounded,
+                        () => canIncrease
+                            ? _updateQuantity(_currentQuantity + 1)
+                            : null,
+                        isEnabled: canIncrease),
                   ],
                 ),
               ),
@@ -183,25 +149,14 @@ class _CartItemCardState extends State<CartItemCard> {
     );
   }
 
-  // ✅ WIDGET DE BOTÓN MEJORADO
-  Widget _qtyButton(IconData icon, VoidCallback onTap,
-      {bool isEnabled = true}) {
-    return Material(
-      color: isEnabled
-          ? AppColors.tertiaryS
-          : AppColors.secondaryS.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: isEnabled ? onTap : null,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(6),
-          child: Icon(
-            icon,
-            size: 20,
-            color: isEnabled ? AppColors.extradarkT : Colors.grey,
-          ),
-        ),
+  Widget _qtyBtn(IconData icon, VoidCallback? onTap, {bool isEnabled = true}) {
+    return InkWell(
+      onTap: isEnabled ? onTap : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        child: Icon(icon,
+            size: 22, color: isEnabled ? AppColors.primaryP : Colors.grey[400]),
       ),
     );
   }
