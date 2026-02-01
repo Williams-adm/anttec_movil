@@ -51,7 +51,7 @@ class _CartScreenState extends State<CartScreen> {
                     style:
                         TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
-                const Text("Se eliminarán todos los productos de la lista.",
+                const Text("Se eliminarán todos los productos.",
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey)),
                 const SizedBox(height: 30),
@@ -104,6 +104,8 @@ class _CartScreenState extends State<CartScreen> {
             return Column(
               children: [
                 _buildHeader(context, cartProvider),
+
+                // LISTA DE PRODUCTOS
                 Expanded(
                   child: cartProvider.items.isEmpty
                       ? _buildEmptyCard(context)
@@ -118,8 +120,10 @@ class _CartScreenState extends State<CartScreen> {
                               provider: cartProvider),
                         ),
                 ),
+
+                // ✅ SECCIÓN INFERIOR (TOTAL + BOTONES)
                 if (cartProvider.items.isNotEmpty) ...[
-                  _buildBottomActions(context),
+                  _buildBottomSummary(context, cartProvider),
                 ],
               ],
             );
@@ -160,46 +164,79 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildBottomActions(BuildContext context) {
+  // ✅ NUEVO WIDGET: Muestra el total y los botones
+  Widget _buildBottomSummary(BuildContext context, CartProvider provider) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 20,
-                offset: const Offset(0, -5))
-          ]),
-      child: Row(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, -5))
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min, // Se ajusta al contenido
         children: [
-          Expanded(
-              child: OutlinedButton(
-            onPressed: () => context.go('/home'),
-            style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                side: const BorderSide(color: AppColors.primaryP, width: 1.5),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16))),
-            child: const Text('AÑADIR MÁS',
+          // 1. FILA DEL TOTAL
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Total a pagar",
                 style: TextStyle(
-                    fontWeight: FontWeight.w800, color: AppColors.primaryP)),
-          )),
-          const SizedBox(width: 16),
-          Expanded(
-              child: ElevatedButton(
-            onPressed: () => context.pushNamed('checkout'),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryP,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-                elevation: 0),
-            child: const Text('FINALIZAR',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-          )),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey),
+              ),
+              Text(
+                "S/. ${provider.totalAmount.toStringAsFixed(2)}", // Usa el getter del provider
+                style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.extradarkT),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // 2. BOTONES DE ACCIÓN
+          Row(
+            children: [
+              Expanded(
+                  child: OutlinedButton(
+                onPressed: () => context.go('/home'),
+                style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    side:
+                        const BorderSide(color: AppColors.primaryP, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16))),
+                child: const Text('AÑADIR MÁS',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primaryP)),
+              )),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: ElevatedButton(
+                onPressed: () => context.pushNamed('checkout'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryP,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    elevation: 0),
+                child: const Text('FINALIZAR',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              )),
+            ],
+          ),
         ],
       ),
     );
