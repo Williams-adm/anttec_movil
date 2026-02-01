@@ -6,6 +6,7 @@ import 'package:anttec_movil/app/ui/sales_report/viewmodel/sales_report_viewmode
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class SalesReportScreen extends StatefulWidget {
   const SalesReportScreen({super.key});
@@ -26,21 +27,37 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   @override
   void initState() {
     super.initState();
+    // 1. Pedir permisos al iniciar la pantalla
+    _requestPermissions();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SalesReportViewmodel>().loadSales();
     });
   }
 
-  // ✅ FUNCIONALIDAD PRINCIPAL: Abre el Modal de Selección
+  // 2. Función para solicitar permisos de red y bluetooth
+  Future<void> _requestPermissions() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.location,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ].request();
+
+    if (statuses[Permission.location]!.isDenied) {
+      dev.log(
+          "⚠️ Permiso de ubicación denegado. El escaneo de red no funcionará.");
+    }
+  }
+
+  //  3. Manejador Principal: Abre el Modal de Selección
   void _handlePrint(Map<String, dynamic> sale) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Permite que el modal sea alto
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return PrinterSelectorModal(
           onPrinterSelected: (type, address) {
-            // Callback: Se ejecuta cuando el usuario selecciona y confirma
             _executePrint(type, address, sale);
           },
         );
@@ -48,10 +65,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     );
   }
 
-  // ✅ EJECUTOR: Realiza la impresión final
+  //  4. Ejecutor: Realiza la impresión final
   void _executePrint(
       String type, String address, Map<String, dynamic> sale) async {
-    // Feedback visual
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(children: [
@@ -61,10 +77,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               child: CircularProgressIndicator(
                   color: Colors.white, strokeWidth: 2)),
           const SizedBox(width: 15),
-          Text("Imprimiendo en $address...")
+          Text("Conectando a $address...")
         ]),
         backgroundColor: Colors.black87,
-        duration: const Duration(seconds: 2),
       ),
     );
 
@@ -80,12 +95,13 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text("Error"),
-            content: Text("No se pudo imprimir.\n\n$e"),
+            title: const Text("Error de Conexión"),
+            content:
+                Text("No se pudo imprimir en la dirección seleccionada.\n\n$e"),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("OK"))
+                  child: const Text("Cerrar"))
             ],
           ),
         );
@@ -343,7 +359,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                   ),
                 ),
 
-                // BOTÓN IMPRIMIR
+                // BOTÓN IMPRIMIR CONECTADO AL MODAL
                 OutlinedButton.icon(
                   onPressed: () => _handlePrint(sale),
                   style: OutlinedButton.styleFrom(
