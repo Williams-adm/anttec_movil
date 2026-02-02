@@ -12,13 +12,25 @@ class AuthService extends ApiService {
 
   Future<LoginResponse> login(LoginRequest loginRequest) async {
     try {
+      // 1. Enviamos petición al servidor
       final response = await dio.post(
         '/auth/login',
         data: loginRequest.toJson(),
       );
 
+      // 2. Convertimos el JSON a objetos (Aquí se llena UserModel con los roles)
       final loginResponse = LoginResponse.fromJson(response.data);
 
+      // 🔒 3. VALIDACIÓN DE SEGURIDAD (EL CANDADO)
+      // Verificamos si la lista de roles contiene "admin"
+      if (!loginResponse.user.roles.contains('admin')) {
+        // ⛔ Si NO es admin, lanzamos error y cortamos el flujo aquí.
+        // El token NO se guardará.
+        throw Exception(
+            'Acceso denegado: Se requieren permisos de Administrador.');
+      }
+
+      // ✅ 4. Si es admin, procedemos a guardar las credenciales
       if (loginResponse.token.isNotEmpty) {
         await _secureStorage.write(
           key: 'auth_token',
@@ -33,16 +45,20 @@ class AuthService extends ApiService {
 
       return loginResponse;
     } on DioException catch (e) {
-      throw Exception(e.error);
+      // Errores de red o credenciales incorrectas desde el servidor
+      throw Exception(e.response?.data['message'] ?? 'Error de conexión');
+    } catch (e) {
+      // Capturamos nuestro error de "Acceso denegado" para mostrarlo en pantalla
+      rethrow;
     }
   }
 
   Future<LogoutResponse> logout() async {
     try {
       final response = await dio.post('/auth/logout');
-
       final logoutResponse = LogoutResponse.fromJson(response.data);
 
+      // Borramos todo al salir
       await _secureStorage.deleteAll();
 
       return logoutResponse;
