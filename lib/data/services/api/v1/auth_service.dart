@@ -21,16 +21,16 @@ class AuthService extends ApiService {
       // 2. Convertimos el JSON a objetos (Aquí se llena UserModel con los roles)
       final loginResponse = LoginResponse.fromJson(response.data);
 
-      // 🔒 3. VALIDACIÓN DE SEGURIDAD (EL CANDADO)
+      //  3. VALIDACIÓN DE SEGURIDAD (EL CANDADO)
       // Verificamos si la lista de roles contiene "admin"
       if (!loginResponse.user.roles.contains('admin')) {
-        // ⛔ Si NO es admin, lanzamos error y cortamos el flujo aquí.
+        //  Si NO es admin, lanzamos error y cortamos el flujo aquí.
         // El token NO se guardará.
         throw Exception(
             'Acceso denegado: Se requieren permisos de Administrador.');
       }
 
-      // ✅ 4. Si es admin, procedemos a guardar las credenciales
+      //  4. Si es admin, procedemos a guardar las credenciales
       if (loginResponse.token.isNotEmpty) {
         await _secureStorage.write(
           key: 'auth_token',
