@@ -1,36 +1,54 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:anttec_movil/data/repositories/auth/auth_repository.dart';
 
 class LoginViewModel extends ChangeNotifier {
   final AuthRepository _authRepository;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   bool _isLoading = false;
   String? _errorMessage;
   bool _rememberMe = false;
-
   String _savedEmail = '';
   String _savedPassword = '';
 
   LoginViewModel({required AuthRepository authRepository})
       : _authRepository = authRepository {
-    _loadSavedCredentials(); // Carga datos al iniciar
+    loadSavedCredentials();
   }
 
   // Getters
-  String? get errorMessage => _errorMessage;
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
   bool get rememberMe => _rememberMe;
   String get savedEmail => _savedEmail;
   String get savedPassword => _savedPassword;
 
-  Future<bool> login(String email, String password) async {
-    if (email.isEmpty || password.isEmpty) {
-      _errorMessage = "Por favor, completa todos los campos.";
-      notifyListeners();
-      return false;
+  Future<void> loadSavedCredentials() async {
+    try {
+      final flag = await _storage.read(key: 'remember_me_flag');
+      if (flag == 'true') {
+        _savedEmail = await _storage.read(key: 'saved_email') ?? '';
+        _savedPassword = await _storage.read(key: 'saved_password') ?? '';
+        _rememberMe = true;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("❌ Error storage: $e");
     }
+  }
 
+  /// ✅ ÚSALO PARA CERRAR SESIÓN SIN BORRAR EL RECUÉRDAME
+  Future<void> logout() async {
+    // Borramos solo el token, no las credenciales
+    await _storage.delete(key: 'auth_token');
+    // Forzamos la recarga de datos guardados para que aparezcan al volver al login
+    await loadSavedCredentials();
+    debugPrint("🚪 Sesión cerrada. Datos de 'Recuérdame' preservados.");
+  }
+
+  Future<bool> login(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -38,34 +56,28 @@ class LoginViewModel extends ChangeNotifier {
     try {
       final result =
           await _authRepository.login(email: email, password: password);
-
       if (result.success) {
-        // ============================================================
-        // 🔥 CORRECCIÓN CRUCIAL: GUARDAR EL TOKEN PARA LA API
-        // ============================================================
-        final prefs = await SharedPreferences.getInstance();
-
-        // Verificamos que el token venga en la respuesta
+        TextInput.finishAutofillContext(shouldSave: true);
         if (result.token.isNotEmpty) {
-          await prefs.setString('auth_token', result.token);
-          debugPrint(
-              "🔑 LOGIN: Token guardado en memoria: ${result.token.substring(0, 10)}...");
-        } else {
-          debugPrint("⚠️ LOGIN: El backend respondió success pero SIN token.");
+          await _storage.write(key: 'auth_token', value: result.token);
         }
-        // ============================================================
 
-        // 🔥 GUARDADO LOCAL "RECUÉRDAME" (EMAIL/PASS)
-        debugPrint("💾 Procesando Recuérdame... Checkbox activo: $_rememberMe");
-        await _handleRememberMe(email, password);
-
+        if (_rememberMe) {
+          await _storage.write(key: 'remember_me_flag', value: 'true');
+          await _storage.write(key: 'saved_email', value: email);
+          await _storage.write(key: 'saved_password', value: password);
+        } else {
+          await _storage.delete(key: 'remember_me_flag');
+          await _storage.delete(key: 'saved_email');
+          await _storage.delete(key: 'saved_password');
+        }
         return true;
       } else {
         _errorMessage = result.message;
         return false;
       }
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _errorMessage = e.toString().replaceAll('Exception: ', '').trim();
       return false;
     } finally {
       _isLoading = false;
@@ -81,47 +93,5 @@ class LoginViewModel extends ChangeNotifier {
   void clearErrorMessage() {
     _errorMessage = null;
     notifyListeners();
-  }
-
-  // --- CARGA DE DATOS (SharedPreferences) ---
-  Future<void> _loadSavedCredentials() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final remember = prefs.getBool('remember_me') ?? false;
-      final email = prefs.getString('saved_email');
-      final password = prefs.getString('saved_password');
-
-      debugPrint(
-          "📂 Cargando datos locales -> Remember: $remember, Email: $email");
-
-      if (remember && email != null && password != null) {
-        _rememberMe = true;
-        _savedEmail = email;
-        _savedPassword = password;
-
-        // 🔥 AVISAR A LA PANTALLA PARA QUE LLENE LOS CAMPOS
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint("❌ Error cargando SharedPreferences: $e");
-    }
-  }
-
-  // --- GUARDADO DE DATOS (SharedPreferences) ---
-  Future<void> _handleRememberMe(String email, String password) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    if (_rememberMe) {
-      await prefs.setBool('remember_me', true);
-      await prefs.setString('saved_email', email);
-      await prefs.setString('saved_password', password);
-      debugPrint("✅ Credenciales guardadas EXITOSAMENTE en disco.");
-    } else {
-      await prefs.remove('remember_me');
-      await prefs.remove('saved_email');
-      await prefs.remove('saved_password');
-      debugPrint("🗑️ Credenciales borradas del disco.");
-    }
   }
 }

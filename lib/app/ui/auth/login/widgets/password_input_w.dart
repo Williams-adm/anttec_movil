@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
-// Asegúrate de tener esta librería o usa Icons.visibility nativo
 import 'package:material_symbols_icons/symbols.dart';
 
 class PasswordInputW extends StatefulWidget {
   final TextEditingController controller;
-  final VoidCallback? onFieldSubmitted; // Para dar Enter y entrar
+  final VoidCallback? onFieldSubmitted;
 
   const PasswordInputW({
     super.key,
@@ -18,29 +17,23 @@ class PasswordInputW extends StatefulWidget {
 }
 
 class _PasswordInputWState extends State<PasswordInputW> {
-  bool _hasText = false;
   bool _obscure = true;
 
   @override
   void initState() {
     super.initState();
-    _hasText = widget.controller.text.isNotEmpty;
-    widget.controller.addListener(_updateColor);
+    // Escuchamos el controlador para actualizar el estado visual (fillColor)
+    widget.controller.addListener(_handleTextChanged);
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_updateColor);
+    widget.controller.removeListener(_handleTextChanged);
     super.dispose();
   }
 
-  void _updateColor() {
-    final hasTextNow = widget.controller.text.isNotEmpty;
-    if (_hasText != hasTextNow) {
-      setState(() {
-        _hasText = hasTextNow;
-      });
-    }
+  void _handleTextChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -48,12 +41,10 @@ class _PasswordInputWState extends State<PasswordInputW> {
     return TextFormField(
       controller: widget.controller,
       obscureText: _obscure,
-      // --- CONFIGURACIÓN PARA GOOGLE AUTOFILL ---
       keyboardType: TextInputType.visiblePassword,
-      textInputAction: TextInputAction.done, // Botón de "Ir" o "Check"
-      autofillHints: const [AutofillHints.password], // 🔥 Clave para Smart Lock
+      textInputAction: TextInputAction.done,
+      autofillHints: const [AutofillHints.password],
       onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
-      // ------------------------------------------
       validator: (value) {
         if (value == null || value.isEmpty) {
           return 'La contraseña es requerida';
@@ -67,10 +58,8 @@ class _PasswordInputWState extends State<PasswordInputW> {
       decoration: InputDecoration(
         hintText: '••••••••',
         hintStyle: const TextStyle(color: Colors.grey),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
           borderSide: BorderSide.none,
@@ -84,7 +73,10 @@ class _PasswordInputWState extends State<PasswordInputW> {
           borderSide: const BorderSide(color: AppColors.primaryP, width: 2),
         ),
         filled: true,
-        fillColor: _hasText ? const Color(0xFFE8F0FE) : Colors.transparent,
+        // ✅ Sincronización de color corregida
+        fillColor: widget.controller.text.isNotEmpty
+            ? const Color(0xFFE8F0FE)
+            : Colors.white,
         suffixIcon: IconButton(
           onPressed: () {
             setState(() {
