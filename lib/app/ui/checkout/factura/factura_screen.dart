@@ -74,7 +74,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
       BuildContext context, double total, CartProvider cart) {
     if (_rucController.text.length != 11) {
       _showCustomNotice(
-          message: "El RUC debe tener 11 dígitos exactos",
+          message: "El RUC debe tener 11 dígitos",
           icon: Symbols.info,
           color: Colors.orange[800]!);
       return;
@@ -96,13 +96,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
             color: Colors.redAccent);
         return;
       }
-    }
-    if (_selectedPayment == 'yape' && _opController.text.isEmpty) {
-      _showCustomNotice(
-          message: "Ingresa el Nro. de Operación",
-          icon: Symbols.qr_code_2,
-          color: Colors.blueAccent);
-      return;
     }
     _showSuccessDialog(context, total, cart);
   }
@@ -173,7 +166,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   height: 55,
                   child: TextButton(
                     onPressed: () {
-                      cart.clearCart();
+                      cart.clearCart(); // ✅ Método corregido
                       ctx.go('/home');
                     },
                     style: TextButton.styleFrom(
@@ -241,19 +234,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
     }
   }
 
-  void _simularValidacion() {
-    if (_rucController.text.length == 11) {
-      setState(() {
-        _razonSocialController.text = "ANTTEC SOLUCIONES S.A.C.";
-        _direccionController.text = "Av. Principal 456, Huancayo";
-      });
-      _showCustomNotice(
-          message: "RUC Validado correctamente",
-          icon: Symbols.check_circle,
-          color: Colors.green);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
@@ -285,10 +265,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                 icon: Symbols.business,
                 controller: _rucController,
                 isNumeric: true,
-                maxLength: 11,
-                suffix: TextButton(
-                    onPressed: _simularValidacion,
-                    child: const Text("VALIDAR"))),
+                maxLength: 11),
             const SizedBox(height: 15),
             _buildInputField(
                 label: "Razón Social",
@@ -342,23 +319,22 @@ class _FacturaScreenState extends State<FacturaScreen> {
           border: Border.all(color: AppColors.primaryP.withValues(alpha: 0.1))),
       child: Column(children: [
         TextField(
-          controller: _recibidoController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
-          ],
-          onChanged: (_) => _calculateChange(total),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primaryP),
-          decoration: const InputDecoration(
-              hintText: "0.00",
-              labelText: "EFECTIVO RECIBIDO",
-              border: InputBorder.none,
-              floatingLabelBehavior: FloatingLabelBehavior.always),
-        ),
+            controller: _recibidoController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+            ],
+            onChanged: (_) => _calculateChange(total),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: AppColors.primaryP),
+            decoration: const InputDecoration(
+                hintText: "0.00",
+                labelText: "EFECTIVO RECIBIDO",
+                border: InputBorder.none,
+                floatingLabelBehavior: FloatingLabelBehavior.always)),
         const Divider(),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text("VUELTO:",
@@ -383,24 +359,23 @@ class _FacturaScreenState extends State<FacturaScreen> {
       int? maxLength,
       Widget? suffix}) {
     return TextField(
-      controller: controller,
-      maxLength: maxLength,
-      inputFormatters: [
-        if (isNumeric) FilteringTextInputFormatter.digitsOnly,
-        if (maxLength != null) LengthLimitingTextInputFormatter(maxLength)
-      ],
-      decoration: InputDecoration(
-          counterText: "",
-          labelText: label,
-          hintText: hint,
-          suffixIcon: suffix,
-          prefixIcon: Icon(icon, color: AppColors.primaryP),
-          filled: true,
-          fillColor: AppColors.primaryS,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none)),
-    );
+        controller: controller,
+        maxLength: maxLength,
+        inputFormatters: [
+          if (isNumeric) FilteringTextInputFormatter.digitsOnly,
+          if (maxLength != null) LengthLimitingTextInputFormatter(maxLength)
+        ],
+        decoration: InputDecoration(
+            counterText: "",
+            labelText: label,
+            hintText: hint,
+            suffixIcon: suffix,
+            prefixIcon: Icon(icon, color: AppColors.primaryP),
+            filled: true,
+            fillColor: AppColors.primaryS,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none)));
   }
 
   Widget _buildPaymentMiniCard(String title, IconData icon, String value) {
@@ -408,22 +383,22 @@ class _FacturaScreenState extends State<FacturaScreen> {
     return GestureDetector(
       onTap: () => setState(() => _selectedPayment = value),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryP : AppColors.primaryS,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-                color: isSelected ? AppColors.primaryP : AppColors.tertiaryS)),
-        child: Column(children: [
-          Icon(icon, color: isSelected ? Colors.white : AppColors.primaryP),
-          const SizedBox(height: 5),
-          Text(title,
-              style: TextStyle(
-                  color: isSelected ? Colors.white : AppColors.extradarkT,
-                  fontWeight: FontWeight.bold)),
-        ]),
-      ),
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          decoration: BoxDecoration(
+              color: isSelected ? AppColors.primaryP : AppColors.primaryS,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                  color:
+                      isSelected ? AppColors.primaryP : AppColors.tertiaryS)),
+          child: Column(children: [
+            Icon(icon, color: isSelected ? Colors.white : AppColors.primaryP),
+            const SizedBox(height: 5),
+            Text(title,
+                style: TextStyle(
+                    color: isSelected ? Colors.white : AppColors.extradarkT,
+                    fontWeight: FontWeight.bold))
+          ])),
     );
   }
 
@@ -503,15 +478,14 @@ class _FacturaScreenState extends State<FacturaScreen> {
         width: double.infinity,
         height: 60,
         child: ElevatedButton(
-          onPressed: () => _validarYFinalizar(context, total, cart),
-          style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryP,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20))),
-          child: Text(text,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ));
+            onPressed: () => _validarYFinalizar(context, total, cart),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryP,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20))),
+            child: Text(text,
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold))));
   }
 }

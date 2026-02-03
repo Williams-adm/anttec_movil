@@ -2,30 +2,27 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // ✅ Cambiado de SharedPreferences
 
-// --- SERVICIOS Y REPOSITORIOS (DATA LAYER) ---
+// Repositorios
 import 'package:anttec_movil/data/services/api/v1/auth_service.dart';
 import 'package:anttec_movil/data/repositories/auth/auth_repository.dart';
 import 'package:anttec_movil/data/repositories/auth/auth_respository_remote.dart';
-
 import 'package:anttec_movil/data/services/api/v1/category_service.dart';
 import 'package:anttec_movil/data/repositories/category/category_repository.dart';
 import 'package:anttec_movil/data/repositories/category/category_repository_remote.dart';
-
 import 'package:anttec_movil/app/ui/cart/repositories/cart_repository.dart';
 
-// --- VIEWMODELS Y PROVIDERS (UI LAYER) ---
+// ViewModels
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:anttec_movil/app/ui/layout/view_models/layout_home_viewmodel.dart';
-
-// ✅ 1. IMPORTAMOS EL NUEVO VIEWMODEL DE REPORTES
 import 'package:anttec_movil/app/ui/sales_report/viewmodel/sales_report_viewmodel.dart';
+import 'package:anttec_movil/app/ui/auth/login/view_models/login_viewmodel.dart';
 
 List<SingleChildWidget> get providersRemote {
   return [
     // =============================================================
-    // 0. CLIENTE HTTP (Dio)
+    // 0. CLIENTE HTTP (Dio) con SecureStorage
     // =============================================================
     Provider<Dio>(
       create: (_) {
@@ -41,12 +38,13 @@ List<SingleChildWidget> get providersRemote {
 
         dio.interceptors
             .add(InterceptorsWrapper(onRequest: (options, handler) async {
-          final prefs = await SharedPreferences.getInstance();
-          final token = prefs.getString('auth_token');
+          // ✅ USAMOS SECURE STORAGE PARA QUE COINCIDA CON EL LOGIN
+          const storage = FlutterSecureStorage();
+          final token = await storage.read(key: 'auth_token');
 
           if (kDebugMode) {
             debugPrint(
-                "🔑 Token en interceptor: ${token != null ? 'Presente' : 'Nulo'}");
+                "🔑 Interceptor: Token ${token != null ? 'encontrado' : 'NULO'}");
           }
 
           if (token != null) {
@@ -56,7 +54,7 @@ List<SingleChildWidget> get providersRemote {
         }, onError: (DioException e, handler) {
           if (kDebugMode) {
             debugPrint(
-                "❌ Error DIO Global: ${e.response?.statusCode} - ${e.message}");
+                "❌ Error DIO [${e.response?.statusCode}]: ${e.requestOptions.path}");
           }
           return handler.next(e);
         }));
@@ -66,36 +64,37 @@ List<SingleChildWidget> get providersRemote {
     ),
 
     // =============================================================
-    // 1. Servicios y Repositorios Base
+    // 1. Servicios y Repositorios
     // =============================================================
     Provider<AuthService>(create: (_) => AuthService()),
     Provider<AuthRepository>(
       create: (context) => AuthRespositoryRemote(authService: context.read()),
     ),
-
     Provider<CategoryService>(create: (_) => CategoryService()),
     Provider<CategoryRepository>(
       create: (context) =>
           CategoryRepositoryRemote(categoryService: context.read()),
     ),
-
-    // =============================================================
-    // 2. Repositorio de Carrito
-    // =============================================================
     Provider<CartRepository>(
       create: (context) => CartRepository(context.read<Dio>()),
     ),
 
     // =============================================================
-    // 3. Providers de UI
+    // 2. ViewModels / Providers de UI
     // =============================================================
+
+    // Login (Agregado para que sea global)
+    ChangeNotifierProvider<LoginViewModel>(
+      create: (context) =>
+          LoginViewModel(authRepository: context.read<AuthRepository>()),
+    ),
 
     // Carrito
     ChangeNotifierProvider<CartProvider>(
       create: (context) => CartProvider(context.read<CartRepository>()),
     ),
 
-    // ViewModel Global del Home
+    // Home
     ChangeNotifierProvider<LayoutHomeViewmodel>(
       create: (context) => LayoutHomeViewmodel(
         authRepository: context.read<AuthRepository>(),
@@ -105,7 +104,6 @@ List<SingleChildWidget> get providersRemote {
         ..loadCategories(),
     ),
 
-    // ✅ 2. AGREGAMOS EL PROVIDER DE REPORTES AQUÍ
     ChangeNotifierProvider<SalesReportViewmodel>(
       create: (_) => SalesReportViewmodel(),
     ),

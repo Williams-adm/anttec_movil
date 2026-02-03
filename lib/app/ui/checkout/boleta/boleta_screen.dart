@@ -83,7 +83,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
       BuildContext context, double total, CartProvider cart) {
     if (_dniController.text.length != 8) {
       _showCustomNotice(
-          message: "El DNI debe tener 8 dígitos exactos",
+          message: "El DNI debe tener 8 dígitos",
           icon: Symbols.info,
           color: Colors.orange[800]!);
       return;
@@ -112,7 +112,6 @@ class _BoletaScreenState extends State<BoletaScreen> {
           color: Colors.blueAccent);
       return;
     }
-
     _showSuccessDialog(context, total, cart);
   }
 
@@ -183,7 +182,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
                   height: 55,
                   child: TextButton(
                     onPressed: () {
-                      cart.clearCart();
+                      cart.clearCart(); // ✅ Método ahora definido en Provider
                       ctx.go('/home');
                     },
                     style: TextButton.styleFrom(

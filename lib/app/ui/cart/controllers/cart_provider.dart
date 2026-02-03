@@ -22,10 +22,7 @@ class CartProvider extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      final newItems = await _cartRepository.getCart();
-      if (newItems.isNotEmpty || _items.isEmpty) {
-        _items = newItems;
-      }
+      _items = await _cartRepository.getCart();
       errorMessage = null;
     } catch (e) {
       errorMessage = e.toString();
@@ -40,40 +37,11 @@ class CartProvider extends ChangeNotifier {
     try {
       await _cartRepository.addItem(
           productId: productId, variantId: variantId, quantity: quantity);
-      await fetchCart(silent: false);
+      await fetchCart(silent: true);
       return true;
     } catch (e) {
-      notifyListeners();
+      debugPrint("❌ Error addItem: $e");
       return false;
-    }
-  }
-
-  // ✅ REMOVE ITEM: Ahora usa variantId
-  Future<void> removeItem(CartItem item) async {
-    final backup = List<CartItem>.from(_items);
-    _items.removeWhere((i) => i.id == item.id); // Borrado visual
-    notifyListeners();
-
-    try {
-      // Pasamos variantId para el truco ninja
-      await _cartRepository.removeItem(item.variantId);
-      await fetchCart(silent: true);
-    } catch (e) {
-      debugPrint("❌ Error eliminando: $e");
-      _items = backup; // Restaurar si falla
-      notifyListeners();
-    }
-  }
-
-  Future<void> clearCart() async {
-    final backup = List<CartItem>.from(_items);
-    _items = [];
-    notifyListeners();
-    try {
-      await _cartRepository.clearCart();
-    } catch (e) {
-      _items = backup;
-      notifyListeners();
     }
   }
 
@@ -82,7 +50,42 @@ class CartProvider extends ChangeNotifier {
       await _cartRepository.updateItem(variantId, quantity);
       await fetchCart(silent: true);
     } catch (e) {
+      debugPrint("❌ Error updateItem: $e");
       await fetchCart(silent: true);
     }
+  }
+
+  Future<void> removeItem(CartItem item) async {
+    final backup = List<CartItem>.from(_items);
+    _items.removeWhere((i) => i.variantId == item.variantId);
+    notifyListeners();
+
+    try {
+      await _cartRepository.removeItem(item.variantId);
+      await fetchCart(silent: true);
+    } catch (e) {
+      _items = backup;
+      notifyListeners();
+    }
+  }
+
+  // ✅ MÉTODO AÑADIDO PARA SOLUCIONAR EL ERROR
+  Future<void> clearCart() async {
+    final backup = List<CartItem>.from(_items);
+    _items = [];
+    notifyListeners();
+    try {
+      await _cartRepository.clearCart();
+      errorMessage = null;
+    } catch (e) {
+      _items = backup;
+      notifyListeners();
+    }
+  }
+
+  void resetLocalData() {
+    _items = [];
+    errorMessage = null;
+    notifyListeners();
   }
 }

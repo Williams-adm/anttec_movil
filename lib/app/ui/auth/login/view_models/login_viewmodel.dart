@@ -18,7 +18,6 @@ class LoginViewModel extends ChangeNotifier {
     loadSavedCredentials();
   }
 
-  // Getters
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get rememberMe => _rememberMe;
@@ -32,20 +31,15 @@ class LoginViewModel extends ChangeNotifier {
         _savedEmail = await _storage.read(key: 'saved_email') ?? '';
         _savedPassword = await _storage.read(key: 'saved_password') ?? '';
         _rememberMe = true;
-        notifyListeners();
+      } else {
+        _savedEmail = '';
+        _savedPassword = '';
+        _rememberMe = false;
       }
+      notifyListeners();
     } catch (e) {
       debugPrint("❌ Error storage: $e");
     }
-  }
-
-  /// ✅ ÚSALO PARA CERRAR SESIÓN SIN BORRAR EL RECUÉRDAME
-  Future<void> logout() async {
-    // Borramos solo el token, no las credenciales
-    await _storage.delete(key: 'auth_token');
-    // Forzamos la recarga de datos guardados para que aparezcan al volver al login
-    await loadSavedCredentials();
-    debugPrint("🚪 Sesión cerrada. Datos de 'Recuérdame' preservados.");
   }
 
   Future<bool> login(String email, String password) async {
@@ -56,8 +50,20 @@ class LoginViewModel extends ChangeNotifier {
     try {
       final result =
           await _authRepository.login(email: email, password: password);
+
       if (result.success) {
+        // 🔒 SEGURIDAD: Validar Rol de Administrador
+        if (!result.roles.contains('admin')) {
+          _errorMessage =
+              "Acceso denegado: No tienes permisos de administrador.";
+          _isLoading = false;
+          notifyListeners();
+          return false; // ⛔ Detenemos el login aquí
+        }
+
+        // ✅ Si es admin, continuamos...
         TextInput.finishAutofillContext(shouldSave: true);
+
         if (result.token.isNotEmpty) {
           await _storage.write(key: 'auth_token', value: result.token);
         }
@@ -83,6 +89,12 @@ class LoginViewModel extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> logout() async {
+    await _storage.delete(key: 'auth_token');
+    await loadSavedCredentials();
+    debugPrint("🚪 Sesión cerrada en disco.");
   }
 
   void toggleRememberMe(bool value) {
