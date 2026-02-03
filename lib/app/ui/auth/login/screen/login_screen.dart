@@ -56,18 +56,15 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    // Llamamos al login (que ahora valida roles internamente)
     final success = await widget.viewModel.login(
       _emailController.text.trim(),
       _passwordController.text,
     );
 
     if (success && mounted) {
-      // Si pasó la validación de roles, refrescamos carrito y entramos
       context.read<CartProvider>().fetchCart(silent: true);
       context.goNamed('home');
     }
-    // Si success es false, el ViewModel ya seteó el _errorMessage y la UI se repintará sola
   }
 
   @override
@@ -106,6 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // ✅ AQUÍ ESTÁ EL CAMBIO PARA SUBIR EL LOGO
   Widget _buildHeader(Size size) {
     return Container(
       width: double.infinity,
@@ -116,11 +114,17 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
       ),
-      child: Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: size.height * 0.04),
-          child: Image.asset('assets/img/logo.png',
-              height: 220, color: Colors.white),
+      child: Padding(
+        // padding top: 8% de la altura de la pantalla (más cerca del borde superior)
+        padding: EdgeInsets.only(top: size.height * 0.08),
+        child: Align(
+          alignment:
+              Alignment.topCenter, // Alineamos arriba en lugar de centrar
+          child: Image.asset(
+            'assets/img/logo.png',
+            height: 200, // Ajusté ligeramente el tamaño para que encaje mejor
+            color: Colors.white,
+          ),
         ),
       ),
     );
@@ -170,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
 
-                // ✅ VISUALIZACIÓN DE ERROR (SI NO ES ADMIN)
+                // Mensaje de Error (Rojo)
                 if (widget.viewModel.errorMessage != null) ...[
                   const SizedBox(height: 15),
                   Container(
