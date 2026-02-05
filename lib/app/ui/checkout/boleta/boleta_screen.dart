@@ -1,4 +1,4 @@
-import 'package:anttec_movil/data/services/api/v1/customer_service.dart'; // <--- IMPORTANTE
+import 'package:anttec_movil/data/services/api/v1/customer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
@@ -20,42 +20,44 @@ class BoletaScreen extends StatefulWidget {
 }
 
 class _BoletaScreenState extends State<BoletaScreen> {
-  // Configuración de Pago
+  // Configuracion de metodos de pago
   String _selectedPayment = 'efectivo';
   String _digitalWallet = 'yape';
 
-  // Configuración de Cliente
-  String _tipoDocumento = 'DNI'; // Opciones: 'DNI', 'CE'
+  // Configuracion de tipo de documento para el cliente
+  String _tipoDocumento = 'DNI';
 
+  // Controladores de texto para el formulario
   final TextEditingController _docNumberController = TextEditingController();
   final TextEditingController _nombreController = TextEditingController();
-  final TextEditingController _apellidoController =
-      TextEditingController(); // Nuevo campo
-
+  final TextEditingController _apellidoController = TextEditingController();
   final TextEditingController _recibidoController = TextEditingController();
   final TextEditingController _opController = TextEditingController();
 
-  // Servicios
+  // Instancias de servicios API y utilidades
   final PrinterService _printerService = PrinterService();
   final PaymentService _paymentService = PaymentService();
-  final CustomerService _customerService = CustomerService(); // Nuevo servicio
+  final CustomerService _customerService = CustomerService();
 
+  // Variables de estado local
   double _vuelto = 0.0;
-  bool _isProcessing = false;
-  bool _isSearchingDni = false; // Para el loading del botón de búsqueda
+  bool _isProcessing = false; // Bloqueo durante transaccion
+  bool _isSearchingDni = false; // Bloqueo durante busqueda RENIEC
 
-  // Variables QR
+  // Variables para la imagen QR dinamica
   String? _qrImageUrl;
   bool _isLoadingQr = false;
 
   @override
   void initState() {
     super.initState();
+    // Carga inicial del QR de Yape
     _cargarImagenQr('yape');
   }
 
   @override
   void dispose() {
+    // Limpieza de controladores para evitar fugas de memoria
     _docNumberController.dispose();
     _nombreController.dispose();
     _apellidoController.dispose();
@@ -64,9 +66,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
     super.dispose();
   }
 
-  // --- LOGICA BUSQUEDA DNI ---
+  // --- LOGICA BUSQUEDA DNI (RENIEC) ---
   Future<void> _buscarDni() async {
     final dni = _docNumberController.text.trim();
+
+    // Validacion basica de longitud antes de llamar a la API
     if (dni.length != 8) {
       _showCustomNotice(
           message: "El DNI debe tener 8 dígitos",
@@ -77,17 +81,18 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
     setState(() => _isSearchingDni = true);
 
-    // Limpiamos campos antes de buscar
+    // Limpiamos campos de nombre para evitar mezclar datos
     _nombreController.clear();
     _apellidoController.clear();
 
     try {
       final data = await _customerService.consultarDni(dni);
 
+      // Verificamos si el widget sigue activo despues de la espera
       if (!mounted) return;
 
       if (data != null) {
-        // La API devuelve: name, last_name, document_number
+        // Asignamos los datos obtenidos a los controladores
         setState(() {
           _nombreController.text = data['name'] ?? '';
           _apellidoController.text = data['last_name'] ?? '';
@@ -114,13 +119,14 @@ class _BoletaScreenState extends State<BoletaScreen> {
     }
   }
 
-  // --- LOGICA IMAGEN QR ---
+  // --- LOGICA IMAGEN QR (YAPE/PLIN) ---
   Future<void> _cargarImagenQr(String wallet) async {
     setState(() {
       _isLoadingQr = true;
       _qrImageUrl = null;
     });
 
+    // Llamada al servicio para obtener la URL de la imagen
     final url = await _paymentService.obtenerInfoBilletera(wallet);
 
     if (mounted) {
@@ -131,6 +137,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     }
   }
 
+  // Cambio de billetera digital y recarga de QR
   void _cambiarBilletera(String wallet) {
     if (_digitalWallet != wallet) {
       setState(() => _digitalWallet = wallet);
@@ -138,7 +145,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     }
   }
 
-  // --- LOGICA GENERAL UI ---
+  // --- HERRAMIENTAS DE UI (NOTIFICACIONES) ---
   void _showCustomNotice(
       {required String message, required IconData icon, required Color color}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -176,6 +183,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // Calculo automatico del vuelto en efectivo
   void _calculateChange(double total) {
     double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
     setState(() {
@@ -183,10 +191,23 @@ class _BoletaScreenState extends State<BoletaScreen> {
     });
   }
 
+  // --- LOGICA PRINCIPAL DE VALIDACION Y VENTA ---
   void _validarYFinalizar(double total, CartProvider cart) async {
-    // Validaciones
-    int largoDoc = _tipoDocumento == 'DNI' ? 8 : 12; // CE suele ser hasta 12
-    if (_docNumberController.text.length < 8) {
+    // Determinamos la longitud correcta segun el tipo de documento
+    int largoDoc = _tipoDocumento == 'DNI' ? 8 : 12;
+
+    // Validacion estricta para DNI
+    if (_tipoDocumento == 'DNI' &&
+        _docNumberController.text.length != largoDoc) {
+      _showCustomNotice(
+          message: "El DNI debe tener $largoDoc dígitos",
+          icon: Symbols.info,
+          color: Colors.orange);
+      return;
+    }
+
+    // Validacion minima para Carnet de Extranjeria
+    if (_tipoDocumento == 'CE' && _docNumberController.text.length < 8) {
       _showCustomNotice(
           message: "Documento inválido",
           icon: Symbols.info,
@@ -194,6 +215,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
       return;
     }
 
+    // Validamos que se hayan ingresado nombres y apellidos
     if (_nombreController.text.trim().isEmpty ||
         _apellidoController.text.trim().isEmpty) {
       _showCustomNotice(
@@ -203,9 +225,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
       return;
     }
 
+    // Concatenamos nombre completo para enviar al backend
     String nombreCompleto =
         "${_nombreController.text} ${_apellidoController.text}";
 
+    // Flujo de pago: Efectivo
     if (_selectedPayment == 'efectivo') {
       double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
       if (recibido < total) {
@@ -216,7 +240,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
         return;
       }
       _showSuccessDialog(total, cart);
-    } else if (_selectedPayment == 'yape') {
+    }
+    // Flujo de pago: Billetera Digital (API)
+    else if (_selectedPayment == 'yape') {
       if (_opController.text.isEmpty) {
         _showCustomNotice(
             message: "Falta Nro. Operación",
@@ -253,11 +279,8 @@ class _BoletaScreenState extends State<BoletaScreen> {
     }
   }
 
-  // ... _showSuccessDialog, _abrirSelectorImpresora, _imprimir ...
-  // (Mantener igual que antes, solo asegúrate de pasar 'nombreCompleto' si lo usas en el ticket)
-  // Por brevedad, asumo que usas los mismos métodos de impresión de la respuesta anterior.
+  // --- DIALOGO DE EXITO Y NAVEGACION ---
   void _showSuccessDialog(double total, CartProvider cart) {
-    // ... (Mismo código de tu showGeneralDialog anterior)
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -344,6 +367,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // --- MODAL DE SELECCION DE IMPRESORA ---
   void _abrirSelectorImpresora(
       BuildContext context, double total, CartProvider cart) {
     showModalBottomSheet(
@@ -356,6 +380,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // --- LOGICA DE IMPRESION ---
   void _imprimir(
       String type, String address, double total, CartProvider cart) async {
     final Map<String, dynamic> saleData = {
@@ -415,11 +440,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
                     color: AppColors.extradarkT)),
             const SizedBox(height: 15),
 
-            // --- SELECTOR TIPO DOCUMENTO ---
+            // Selector: DNI vs Carnet de Extranjeria
             _buildDocumentTypeSelector(),
             const SizedBox(height: 15),
 
-            // --- INPUT DOCUMENTO CON BOTON DE BUSQUEDA ---
+            // Campo de documento con boton de busqueda (solo para DNI)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -432,9 +457,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
                     icon: Symbols.badge,
                     controller: _docNumberController,
                     isNumeric: true,
+                    // Ajuste dinamico del maximo de caracteres
                     maxLength: _tipoDocumento == 'DNI' ? 8 : 12,
                   ),
                 ),
+                // Boton de busqueda visible solo si es DNI
                 if (_tipoDocumento == 'DNI') ...[
                   const SizedBox(width: 10),
                   _buildSearchButton(),
@@ -444,7 +471,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
             const SizedBox(height: 15),
 
-            // --- NOMBRES Y APELLIDOS SEPARADOS ---
+            // Campos separados para Nombre y Apellido
             _buildInputField(
                 label: "Nombres",
                 hint: "Ingrese nombres",
@@ -454,10 +481,12 @@ class _BoletaScreenState extends State<BoletaScreen> {
             _buildInputField(
                 label: "Apellidos",
                 hint: "Ingrese apellidos",
-                icon: Symbols.person_add, // Icono diferente para variar
+                icon: Symbols.person_add,
                 controller: _apellidoController),
 
             const SizedBox(height: 30),
+
+            // Seccion de Metodos de Pago
             const Text("Método de Pago",
                 style: TextStyle(
                     fontSize: 18,
@@ -473,11 +502,15 @@ class _BoletaScreenState extends State<BoletaScreen> {
                   child: _buildPaymentMiniCard(
                       "Yape / Plin", Symbols.qr_code_scanner, 'yape')),
             ]),
+
             const SizedBox(height: 25),
+
+            // UI Condicional segun metodo de pago
             if (_selectedPayment == 'efectivo')
               _buildCashCalculator(totalPagar),
             if (_selectedPayment == 'yape')
               _buildDigitalWalletSelector(totalPagar),
+
             const SizedBox(height: 30),
             _buildSummaryBox(totalPagar),
             const SizedBox(height: 30),
@@ -489,8 +522,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
-  // --- WIDGETS NUEVOS ---
+  // --- WIDGETS AUXILIARES DE UI ---
 
+  // Selector visual entre DNI y CE
   Widget _buildDocumentTypeSelector() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -507,12 +541,14 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // Boton individual del selector de documento
   Widget _buildDocTypeButton(String type) {
     bool isSelected = _tipoDocumento == type;
     return GestureDetector(
       onTap: () {
         setState(() {
           _tipoDocumento = type;
+          // Limpiamos formulario al cambiar de tipo de documento
           _docNumberController.clear();
           _nombreController.clear();
           _apellidoController.clear();
@@ -538,11 +574,12 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // Boton cuadrado para la busqueda de DNI
   Widget _buildSearchButton() {
     return GestureDetector(
       onTap: _isSearchingDni ? null : _buscarDni,
       child: Container(
-        height: 56, // Altura estándar del input field
+        height: 56, // Misma altura que el input field
         width: 56,
         decoration: BoxDecoration(
           color: AppColors.primaryP,
@@ -561,9 +598,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
-  // --- WIDGETS EXISTENTES (Mantener) ---
-  // (Solo asegúrate de que _buildInputField use el maxLength que le pasamos)
-
+  // Calculadora visual para pagos en efectivo
   Widget _buildCashCalculator(double total) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -604,6 +639,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // Input generico estilizado
   Widget _buildInputField(
       {required String label,
       required String hint,
@@ -632,6 +668,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
                 borderSide: BorderSide.none)));
   }
 
+  // Tarjeta de seleccion de metodo de pago
   Widget _buildPaymentMiniCard(String title, IconData icon, String value) {
     final isSelected = _selectedPayment == value;
     return GestureDetector(
@@ -656,8 +693,8 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // Selector de billetera digital con QR dinamico
   Widget _buildDigitalWalletSelector(double total) {
-    // ... (Mantener implementación previa con _qrImageUrl)
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -675,6 +712,8 @@ class _BoletaScreenState extends State<BoletaScreen> {
                   "Plin", 'plin', const Color(0xFF00B4C5))),
         ]),
         const SizedBox(height: 25),
+
+        // Logica de visualizacion de imagen/carga/error
         _isLoadingQr
             ? const SizedBox(
                 height: 180, child: Center(child: CircularProgressIndicator()))
@@ -712,6 +751,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
+  // Boton selector de tipo de billetera (Yape/Plin)
   Widget _buildWalletTypeButton(String label, String value, Color activeColor) {
     final isSelected = _digitalWallet == value;
     return GestureDetector(

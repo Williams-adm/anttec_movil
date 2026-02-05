@@ -1,3 +1,4 @@
+import 'package:anttec_movil/data/services/api/v1/customer_service.dart'; // Nuevo servicio
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
@@ -6,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // NECESARIO PARA EL QR
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -19,29 +20,34 @@ class FacturaScreen extends StatefulWidget {
 }
 
 class _FacturaScreenState extends State<FacturaScreen> {
+  // Configuración de Pago
   String _selectedPayment = 'efectivo';
   String _digitalWallet = 'yape';
 
   final TextEditingController _rucController = TextEditingController();
   final TextEditingController _razonSocialController = TextEditingController();
   final TextEditingController _direccionController = TextEditingController();
+
   final TextEditingController _recibidoController = TextEditingController();
   final TextEditingController _opController = TextEditingController();
 
+  // Servicios
   final PrinterService _printerService = PrinterService();
   final PaymentService _paymentService = PaymentService();
+  final CustomerService _customerService =
+      CustomerService(); // Instancia servicio clientes
 
   double _vuelto = 0.0;
   bool _isProcessing = false;
+  bool _isSearchingRuc = false; // Estado de carga para búsqueda RUC
 
-  // Variables para manejar la imagen del QR
+  // Variables QR
   String? _qrImageUrl;
   bool _isLoadingQr = false;
 
   @override
   void initState() {
     super.initState();
-    // Cargamos la imagen de Yape por defecto al iniciar
     _cargarImagenQr('yape');
   }
 
@@ -55,7 +61,57 @@ class _FacturaScreenState extends State<FacturaScreen> {
     super.dispose();
   }
 
-  // --- LÓGICA DE IMAGEN QR ---
+  // --- LOGICA BUSQUEDA RUC ---
+  Future<void> _buscarRuc() async {
+    final ruc = _rucController.text.trim();
+    if (ruc.length != 11) {
+      _showCustomNotice(
+          message: "El RUC debe tener 11 dígitos",
+          icon: Symbols.warning,
+          color: Colors.orange);
+      return;
+    }
+
+    setState(() => _isSearchingRuc = true);
+
+    // Limpiamos campos para evitar confusión
+    _razonSocialController.clear();
+    _direccionController.clear();
+
+    try {
+      final data = await _customerService.consultarRuc(ruc);
+
+      if (!mounted) return;
+
+      if (data != null) {
+        // Mapeamos la respuesta de SUNAT
+        setState(() {
+          _razonSocialController.text = data['business_name'] ?? '';
+          _direccionController.text = data['tax_address'] ?? '';
+        });
+        _showCustomNotice(
+            message: "Datos de SUNAT obtenidos",
+            icon: Symbols.check_circle,
+            color: Colors.green);
+      } else {
+        _showCustomNotice(
+            message: "RUC no encontrado",
+            icon: Symbols.domain_disabled,
+            color: Colors.redAccent);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showCustomNotice(
+            message: "Error al consultar SUNAT",
+            icon: Symbols.wifi_off,
+            color: Colors.red);
+      }
+    } finally {
+      if (mounted) setState(() => _isSearchingRuc = false);
+    }
+  }
+
+  // --- LOGICA IMAGEN QR ---
   Future<void> _cargarImagenQr(String wallet) async {
     setState(() {
       _isLoadingQr = true;
@@ -79,7 +135,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
     }
   }
 
-  // --- UI HELPERS ---
+  // --- LOGICA GENERAL UI ---
   void _showCustomNotice(
       {required String message, required IconData icon, required Color color}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -112,9 +168,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
     setState(() => _vuelto = recibido > total ? recibido - total : 0.0);
   }
 
-  // --- LÓGICA DE VALIDACIÓN (Sin parámetro context) ---
   void _validarYFinalizar(double total, CartProvider cart) async {
-    // Validaciones locales
+    // Validaciones
     if (_rucController.text.length != 11) {
       _showCustomNotice(
           message: "El RUC debe tener 11 dígitos",
@@ -131,7 +186,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
       return;
     }
 
-    // Pago Efectivo
     if (_selectedPayment == 'efectivo') {
       double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
       if (recibido < total) {
@@ -142,9 +196,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
         return;
       }
       _showSuccessDialog(total, cart);
-    }
-    // Pago Digital (Yape/Plin)
-    else if (_selectedPayment == 'yape') {
+    } else if (_selectedPayment == 'yape') {
       if (_opController.text.isEmpty) {
         _showCustomNotice(
             message: "Ingresa el Nro. de Operación",
@@ -160,6 +212,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
           wallet: _digitalWallet,
           numeroOperacion: _opController.text,
           monto: total,
+          // Mapeamos los campos correctos para factura
           nombreCliente: _razonSocialController.text,
           documento: _rucController.text,
         );
@@ -169,7 +222,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
         _showSuccessDialog(total, cart);
       } on DioException catch (e) {
         if (!mounted) return;
-
         final message = e.error.toString();
         _showCustomNotice(
           message: message,
@@ -178,16 +230,13 @@ class _FacturaScreenState extends State<FacturaScreen> {
         );
       } catch (e) {
         if (!mounted) return;
-
         _showCustomNotice(
           message: "Error desconocido: $e",
           icon: Symbols.error,
           color: Colors.red,
         );
       } finally {
-        if (mounted) {
-          setState(() => _isProcessing = false);
-        }
+        if (mounted) setState(() => _isProcessing = false);
       }
     }
   }
@@ -350,13 +399,25 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     fontWeight: FontWeight.w900,
                     color: AppColors.extradarkT)),
             const SizedBox(height: 15),
-            _buildInputField(
-                label: "RUC",
-                hint: "11 dígitos",
-                icon: Symbols.business,
-                controller: _rucController,
-                isNumeric: true,
-                maxLength: 11),
+
+            // --- CAMPO RUC CON BOTON DE BUSQUEDA ---
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildInputField(
+                      label: "RUC",
+                      hint: "11 dígitos",
+                      icon: Symbols.business,
+                      controller: _rucController,
+                      isNumeric: true,
+                      maxLength: 11),
+                ),
+                const SizedBox(width: 10),
+                _buildSearchButton(),
+              ],
+            ),
+
             const SizedBox(height: 15),
             _buildInputField(
                 label: "Razón Social",
@@ -396,6 +457,30 @@ class _FacturaScreenState extends State<FacturaScreen> {
             _buildActionButton(context, "REALIZAR VENTA", totalPagar, cart),
             const SizedBox(height: 30),
           ],
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGET BOTON BUSQUEDA ---
+  Widget _buildSearchButton() {
+    return GestureDetector(
+      onTap: _isSearchingRuc ? null : _buscarRuc,
+      child: Container(
+        height: 56,
+        width: 56,
+        decoration: BoxDecoration(
+          color: AppColors.primaryP,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: _isSearchingRuc
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2))
+              : const Icon(Symbols.search, color: Colors.white),
         ),
       ),
     );
@@ -493,7 +578,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
     );
   }
 
-  // --- WIDGET ACTUALIZADO CON IMAGEN ---
   Widget _buildDigitalWalletSelector(double total) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -512,8 +596,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   "Plin", 'plin', const Color(0xFF00B4C5))),
         ]),
         const SizedBox(height: 25),
-
-        // Muestra imagen, loading o icono
         _isLoadingQr
             ? const SizedBox(
                 height: 180, child: Center(child: CircularProgressIndicator()))
@@ -540,7 +622,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     color: _digitalWallet == 'yape'
                         ? const Color(0xFF742D87)
                         : const Color(0xFF00B4C5)),
-
         const SizedBox(height: 20),
         _buildInputField(
             label: "Nro. Operación",
@@ -555,7 +636,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
   Widget _buildWalletTypeButton(String label, String value, Color activeColor) {
     final isSelected = _digitalWallet == value;
     return GestureDetector(
-      onTap: () => _cambiarBilletera(value), // Usamos el método de cambio
+      onTap: () => _cambiarBilletera(value),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -594,10 +675,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
         width: double.infinity,
         height: 60,
         child: ElevatedButton(
-            onPressed: _isProcessing
-                ? null
-                : () =>
-                    _validarYFinalizar(total, cart), // Sin parámetro context
+            onPressed:
+                _isProcessing ? null : () => _validarYFinalizar(total, cart),
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryP,
                 foregroundColor: Colors.white,
