@@ -51,6 +51,9 @@ dependencies:
 
   # VITAL: Para escanear la red WiFi y encontrar ticketeras IP
   network_info_plus: ^5.0.3
+  path_provider: ^2.1.5
+  flutter_pdfview: ^1.4.4
+  share_plus: ^10.1.0
 
 dev_dependencies:
   flutter_test:

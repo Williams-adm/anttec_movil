@@ -18,7 +18,7 @@ import 'package:anttec_movil/app/ui/cart/screen/cart_screen.dart';
 
 // Pantallas de Checkout
 import 'package:anttec_movil/app/ui/checkout/checkout_screen.dart';
-import 'package:anttec_movil/app/ui/checkout/boleta/boleta_screen.dart';
+import 'package:anttec_movil/app/ui/checkout/boleta/screen/boleta_screen.dart';
 import 'package:anttec_movil/app/ui/checkout/factura/factura_screen.dart';
 
 // ✅ NUEVA PANTALLA DE REPORTES
