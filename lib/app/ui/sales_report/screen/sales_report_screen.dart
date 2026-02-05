@@ -1,12 +1,16 @@
 import 'dart:developer' as dev;
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart';
+import 'package:material_symbols_icons/symbols.dart';
+
+// IMPORTS PROPIOS
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
 import 'package:anttec_movil/app/ui/shared/widgets/loader_w.dart';
 import 'package:anttec_movil/app/ui/sales_report/viewmodel/sales_report_viewmodel.dart';
-import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
-import 'package:provider/provider.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:anttec_movil/app/ui/sales_report/screen/pdf_viewer_screen.dart'; // IMPORTA TU VISOR
 
 class SalesReportScreen extends StatefulWidget {
   const SalesReportScreen({super.key});
@@ -16,113 +20,167 @@ class SalesReportScreen extends StatefulWidget {
 }
 
 class _SalesReportScreenState extends State<SalesReportScreen> {
-  // --- PALETA DE COLORES ---
   final Color _purpleColor = const Color(0xFF6C3082);
   final Color _blueColor = const Color(0xFF1976D2);
   final Color _backgroundColor = const Color(0xFFF8F0FB);
   final Color _paidColor = const Color(0xFF00C853);
 
   final PrinterService _printerService = PrinterService();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    // 1. Pedir permisos al iniciar la pantalla
     _requestPermissions();
-
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SalesReportViewmodel>().loadSales();
+      context.read<SalesReportViewmodel>().loadSales(refresh: true);
     });
   }
 
-  // 2. Función para solicitar permisos de red y bluetooth
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      final vm = context.read<SalesReportViewmodel>();
+      if (!vm.isLoading) {
+        vm.loadSales();
+      }
+    }
+  }
+
   Future<void> _requestPermissions() async {
-    Map<Permission, PermissionStatus> statuses = await [
+    await [
       Permission.location,
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
     ].request();
+  }
 
-    if (statuses[Permission.location]!.isDenied) {
-      dev.log(
-          "⚠️ Permiso de ubicación denegado. El escaneo de red no funcionará.");
+  // --- NUEVA LÓGICA: NAVEGAR AL VISOR INTERNO ---
+  void _handleViewPdf(String? url, String orderNumber) {
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("No hay PDF disponible"),
+          backgroundColor: Colors.orange));
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PdfViewerScreen(
+          path: url,
+          title: "Comprobante $orderNumber",
+        ),
+      ),
+    );
+  }
+
+  // --- LÓGICA IMPRESIÓN (SIN ERROR DE POP) ---
+  void _handlePrintRequest(int index) async {
+    // 1. Mostrar Loader
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final vm = context.read<SalesReportViewmodel>();
+    // 2. Obtener datos
+    final saleWithItems = await vm.fetchSaleDetailsForPrint(index);
+
+    if (!mounted) return;
+
+    // 3. CERRAR DIÁLOGO CORRECTAMENTE (Usando rootNavigator)
+    Navigator.of(context, rootNavigator: true).pop();
+
+    if (saleWithItems != null) {
+      _openPrinterModal(saleWithItems);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Error al obtener datos de impresión"),
+            backgroundColor: Colors.red),
+      );
     }
   }
 
-  //  3. Manejador Principal: Abre el Modal de Selección
-  void _handlePrint(Map<String, dynamic> sale) {
+  void _openPrinterModal(Map<String, dynamic> sale) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return PrinterSelectorModal(
-          onPrinterSelected: (type, address) {
-            _executePrint(type, address, sale);
-          },
-        );
-      },
+      builder: (context) => PrinterSelectorModal(
+        onPrinterSelected: (type, address) =>
+            _executePrint(type, address, sale),
+      ),
     );
   }
 
-  //  4. Ejecutor: Realiza la impresión final
   void _executePrint(
       String type, String address, Map<String, dynamic> sale) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: [
-          const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                  color: Colors.white, strokeWidth: 2)),
-          const SizedBox(width: 15),
-          Text("Conectando a $address...")
-        ]),
-        backgroundColor: Colors.black87,
-      ),
-    );
-
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text("Imprimiendo ${sale['order_number']}..."),
+      backgroundColor: Colors.black87,
+    ));
     try {
       if (type == 'NET') {
         await _printerService.printNetwork(address, 9100, sale);
       } else {
         await _printerService.printBluetooth(address, sale);
       }
-      dev.log("✅ Impreso correctamente");
     } catch (e) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text("Error de Conexión"),
-            content:
-                Text("No se pudo imprimir en la dirección seleccionada.\n\n$e"),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cerrar"))
-            ],
-          ),
-        );
-      }
+      dev.log("Error impresión: $e");
     }
   }
 
-  double _calculateTotal(List<Map<String, dynamic>> sales) {
-    return sales.fold(0.0, (sum, item) => sum + (item['amount'] as double));
+  // --- UI ---
+  void _showDatePicker() async {
+    final vm = context.read<SalesReportViewmodel>();
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: vm.selectedDate ?? now,
+      firstDate: DateTime(2023),
+      lastDate: now,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: _purpleColor,
+            colorScheme: ColorScheme.light(primary: _purpleColor),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      vm.setDateFilter(picked);
+    }
   }
 
-  IconData _getPaymentIcon(String paymentName) {
-    if (paymentName == 'Yape') return Symbols.account_balance_wallet;
-    if (paymentName == 'Transferencia') return Symbols.credit_card;
-    return Symbols.payments;
+  IconData _getPaymentIcon(String? method) {
+    switch (method?.toLowerCase()) {
+      case 'yape':
+        return Symbols.qr_code;
+      case 'plin':
+        return Symbols.smartphone;
+      case 'card':
+        return Symbols.credit_card;
+      default:
+        return Symbols.payments;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<SalesReportViewmodel>();
-    final totalSales = _calculateTotal(vm.sales);
 
     return Scaffold(
       backgroundColor: _backgroundColor,
@@ -138,27 +196,55 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
           IconButton(
-            onPressed: () => dev.log("Filtrar por fecha"),
-            icon: Icon(Symbols.calendar_month, color: _purpleColor),
+            onPressed: _showDatePicker,
+            icon: Icon(
+              vm.selectedDate != null
+                  ? Symbols.filter_alt_off
+                  : Symbols.calendar_month,
+              color: vm.selectedDate != null ? Colors.red : _purpleColor,
+            ),
           ),
         ],
       ),
       body: LoaderW(
-        isLoading: vm.isLoading,
+        isLoading: vm.isLoading && vm.sales.isEmpty,
         child: Column(
           children: [
-            _buildTotalCard(totalSales, vm.sales.length),
+            if (vm.selectedDate != null)
+              Container(
+                width: double.infinity,
+                color: _purpleColor.withValues(alpha: 0.1),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: Text(
+                    "Filtro: ${DateFormat('dd/MM/yyyy').format(vm.selectedDate!)}",
+                    style: TextStyle(
+                        color: _purpleColor, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            _buildTotalCard(vm.totalSalesAmount, vm.totalDocs),
             const SizedBox(height: 10),
             Expanded(
-              child: vm.sales.isEmpty
+              child: vm.sales.isEmpty && !vm.isLoading
                   ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
-                      itemCount: vm.sales.length,
-                      itemBuilder: (context, index) {
-                        final sale = vm.sales[index];
-                        return _buildSaleCard(sale);
-                      },
+                  : RefreshIndicator(
+                      onRefresh: () async => vm.loadSales(refresh: true),
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 80),
+                        itemCount: vm.sales.length + (vm.isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == vm.sales.length) {
+                            return const Center(
+                                child: Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: CircularProgressIndicator(),
+                            ));
+                          }
+                          return _buildSaleCard(vm.sales[index], index);
+                        },
+                      ),
                     ),
             ),
           ],
@@ -169,17 +255,16 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
 
   Widget _buildTotalCard(double total, int count) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: _purpleColor.withValues(alpha: 0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
+              color: _purpleColor.withValues(alpha: 0.1),
+              blurRadius: 15,
+              offset: const Offset(0, 5)),
         ],
       ),
       child: Row(
@@ -188,7 +273,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Ventas del Día",
+              Text("Total Recaudado",
                   style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 14,
@@ -214,7 +299,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         color: _purpleColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 20)),
-                Text("Docs",
+                Text("Ventas",
                     style: TextStyle(color: _purpleColor, fontSize: 10)),
               ],
             ),
@@ -224,14 +309,13 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     );
   }
 
-  Widget _buildSaleCard(Map<String, dynamic> sale) {
-    final isFactura = sale['type'] == 'Factura';
+  Widget _buildSaleCard(Map<String, dynamic> sale, int index) {
+    final isFactura = sale['type_voucher'] == 'factura';
     final themeColor = isFactura ? _blueColor : _purpleColor;
     final icon = isFactura ? Symbols.domain : Symbols.receipt_long;
-
-    final List items = sale['items'] ?? [];
-    final int productCount = items.length;
-    final String paymentName = sale['payment'] ?? 'Efectivo';
+    final String paymentMethod = sale['method_payment'] ?? 'cash';
+    final double amount = double.tryParse(sale['total'].toString()) ?? 0.0;
+    final String? pdfUrl = sale['voucher'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -240,10 +324,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4))
         ],
       ),
       child: Padding(
@@ -266,25 +349,32 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(sale['type'],
+                      Text(
+                          isFactura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA",
                           style: TextStyle(
                               color: Colors.grey[600],
                               fontWeight: FontWeight.w500,
-                              fontSize: 14)),
+                              fontSize: 12)),
                       const SizedBox(height: 4),
-                      Text(sale['id'],
+                      Text(sale['order_number'] ?? '---',
                           style: const TextStyle(
                               color: Colors.black87,
                               fontWeight: FontWeight.bold,
-                              fontSize: 18)),
+                              fontSize: 16)),
                     ],
                   ),
                 ),
-                Text(sale['date'].toString().substring(0, 10),
-                    style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(sale['time'] ?? '',
+                        style:
+                            TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    Text(sale['date'] ?? '',
+                        style:
+                            TextStyle(color: Colors.grey[500], fontSize: 10)),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -293,86 +383,79 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(Symbols.shopping_bag,
-                            size: 16, color: Colors.grey[600]),
-                        const SizedBox(width: 8),
-                        Text("$productCount Productos",
-                            style: TextStyle(
-                                color: Colors.grey[700], fontSize: 14)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(_getPaymentIcon(paymentName),
-                            size: 16, color: Colors.grey[600]),
-                        const SizedBox(width: 8),
-                        Text(paymentName,
-                            style: TextStyle(
-                                color: Colors.grey[700], fontSize: 14)),
-                      ],
-                    ),
+                    Icon(_getPaymentIcon(paymentMethod),
+                        size: 18, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Text(paymentMethod.toUpperCase(),
+                        style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text("Total",
-                        style:
-                            TextStyle(color: Colors.grey[500], fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text("S/. ${sale['amount'].toStringAsFixed(2)}",
-                        style: const TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 22)),
-                  ],
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _paidColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text("EXITOSO",
+                      style: TextStyle(
+                          color: _paidColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 5),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text("S/. ${amount.toStringAsFixed(2)}",
+                  style: const TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20)),
+            ),
+            const SizedBox(height: 16),
+
+            // --- BOTONES ---
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _paidColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle, color: _paidColor, size: 16),
-                      const SizedBox(width: 6),
-                      Text("PAGADO",
-                          style: TextStyle(
-                              color: _paidColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12)),
-                    ],
+                Expanded(
+                  child: OutlinedButton.icon(
+                    // LÓGICA DE VISOR INTERNO
+                    onPressed: () =>
+                        _handleViewPdf(pdfUrl, sale['order_number'] ?? 'Doc'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: const Icon(Symbols.visibility, size: 18),
+                    label: const Text("Ver PDF"),
                   ),
                 ),
-
-                // BOTÓN IMPRIMIR CONECTADO AL MODAL
-                OutlinedButton.icon(
-                  onPressed: () => _handlePrint(sale),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: themeColor,
-                    side: BorderSide(color: themeColor),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 10),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    // LÓGICA DE IMPRESIÓN (USA ID de ORDEN)
+                    onPressed: () => _handlePrintRequest(index),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Symbols.print, size: 18),
+                    label: const Text("Imprimir"),
                   ),
-                  icon: const Icon(Symbols.print, size: 20),
-                  label: const Text("Imprimir",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -384,6 +467,15 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-        child: Text("Sin ventas", style: TextStyle(color: Colors.grey[400])));
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Symbols.receipt_long, size: 60, color: Colors.grey[300]),
+          const SizedBox(height: 10),
+          Text("No hay ventas registradas",
+              style: TextStyle(color: Colors.grey[500])),
+        ],
+      ),
+    );
   }
 }

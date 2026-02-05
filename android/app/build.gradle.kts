@@ -11,12 +11,14 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        // CAMBIO: Usamos Java 17 para evitar advertencias de "obsolete"
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        // CAMBIO: El target de JVM también debe ser 17
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -25,9 +27,8 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         
-        // ✅ CORRECCIÓN FINAL:
-        // Hemos cambiado "flutter.minSdkVersion" por 21.
-        // Esto es OBLIGATORIO para que el guardado seguro funcione.
+        // NOTA: Si necesitas minSdk 21 obligatorio, puedes poner directamente: minSdk = 21
+        // Si flutter.minSdkVersion ya resuelve a 21 o más, déjalo así.
         minSdk = flutter.minSdkVersion 
         
         targetSdk = flutter.targetSdkVersion
