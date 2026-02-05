@@ -1,9 +1,12 @@
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
+import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // NECESARIO PARA EL QR
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -26,7 +29,21 @@ class _FacturaScreenState extends State<FacturaScreen> {
   final TextEditingController _opController = TextEditingController();
 
   final PrinterService _printerService = PrinterService();
+  final PaymentService _paymentService = PaymentService();
+
   double _vuelto = 0.0;
+  bool _isProcessing = false;
+
+  // Variables para manejar la imagen del QR
+  String? _qrImageUrl;
+  bool _isLoadingQr = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cargamos la imagen de Yape por defecto al iniciar
+    _cargarImagenQr('yape');
+  }
 
   @override
   void dispose() {
@@ -38,6 +55,31 @@ class _FacturaScreenState extends State<FacturaScreen> {
     super.dispose();
   }
 
+  // --- LÓGICA DE IMAGEN QR ---
+  Future<void> _cargarImagenQr(String wallet) async {
+    setState(() {
+      _isLoadingQr = true;
+      _qrImageUrl = null;
+    });
+
+    final url = await _paymentService.obtenerInfoBilletera(wallet);
+
+    if (mounted) {
+      setState(() {
+        _qrImageUrl = url;
+        _isLoadingQr = false;
+      });
+    }
+  }
+
+  void _cambiarBilletera(String wallet) {
+    if (_digitalWallet != wallet) {
+      setState(() => _digitalWallet = wallet);
+      _cargarImagenQr(wallet);
+    }
+  }
+
+  // --- UI HELPERS ---
   void _showCustomNotice(
       {required String message, required IconData icon, required Color color}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -70,8 +112,9 @@ class _FacturaScreenState extends State<FacturaScreen> {
     setState(() => _vuelto = recibido > total ? recibido - total : 0.0);
   }
 
-  void _validarYFinalizar(
-      BuildContext context, double total, CartProvider cart) {
+  // --- LÓGICA DE VALIDACIÓN (Sin parámetro context) ---
+  void _validarYFinalizar(double total, CartProvider cart) async {
+    // Validaciones locales
     if (_rucController.text.length != 11) {
       _showCustomNotice(
           message: "El RUC debe tener 11 dígitos",
@@ -87,6 +130,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
           color: Colors.orange[800]!);
       return;
     }
+
+    // Pago Efectivo
     if (_selectedPayment == 'efectivo') {
       double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
       if (recibido < total) {
@@ -96,12 +141,58 @@ class _FacturaScreenState extends State<FacturaScreen> {
             color: Colors.redAccent);
         return;
       }
+      _showSuccessDialog(total, cart);
     }
-    _showSuccessDialog(context, total, cart);
+    // Pago Digital (Yape/Plin)
+    else if (_selectedPayment == 'yape') {
+      if (_opController.text.isEmpty) {
+        _showCustomNotice(
+            message: "Ingresa el Nro. de Operación",
+            icon: Symbols.qr_code_2,
+            color: Colors.blueAccent);
+        return;
+      }
+
+      setState(() => _isProcessing = true);
+
+      try {
+        await _paymentService.procesarPagoDigital(
+          wallet: _digitalWallet,
+          numeroOperacion: _opController.text,
+          monto: total,
+          nombreCliente: _razonSocialController.text,
+          documento: _rucController.text,
+        );
+
+        if (!mounted) return;
+
+        _showSuccessDialog(total, cart);
+      } on DioException catch (e) {
+        if (!mounted) return;
+
+        final message = e.error.toString();
+        _showCustomNotice(
+          message: message,
+          icon: Symbols.error,
+          color: Colors.red,
+        );
+      } catch (e) {
+        if (!mounted) return;
+
+        _showCustomNotice(
+          message: "Error desconocido: $e",
+          icon: Symbols.error,
+          color: Colors.red,
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+        }
+      }
+    }
   }
 
-  void _showSuccessDialog(
-      BuildContext context, double total, CartProvider cart) {
+  void _showSuccessDialog(double total, CartProvider cart) {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -166,7 +257,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   height: 55,
                   child: TextButton(
                     onPressed: () {
-                      cart.clearCart(); // ✅ Método corregido
+                      cart.clearCart();
                       ctx.go('/home');
                     },
                     style: TextButton.styleFrom(
@@ -402,6 +493,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
     );
   }
 
+  // --- WIDGET ACTUALIZADO CON IMAGEN ---
   Widget _buildDigitalWalletSelector(double total) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -420,11 +512,35 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   "Plin", 'plin', const Color(0xFF00B4C5))),
         ]),
         const SizedBox(height: 25),
-        Icon(Symbols.qr_code_2,
-            size: 180,
-            color: _digitalWallet == 'yape'
-                ? const Color(0xFF742D87)
-                : const Color(0xFF00B4C5)),
+
+        // Muestra imagen, loading o icono
+        _isLoadingQr
+            ? const SizedBox(
+                height: 180, child: Center(child: CircularProgressIndicator()))
+            : _qrImageUrl != null
+                ? Container(
+                    height: 250,
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: CachedNetworkImage(
+                        imageUrl: _qrImageUrl!,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) =>
+                            const Center(child: CircularProgressIndicator()),
+                        errorWidget: (context, url, error) =>
+                            const Icon(Symbols.broken_image, size: 50),
+                      ),
+                    ),
+                  )
+                : Icon(Symbols.qr_code_2,
+                    size: 180,
+                    color: _digitalWallet == 'yape'
+                        ? const Color(0xFF742D87)
+                        : const Color(0xFF00B4C5)),
+
         const SizedBox(height: 20),
         _buildInputField(
             label: "Nro. Operación",
@@ -439,7 +555,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
   Widget _buildWalletTypeButton(String label, String value, Color activeColor) {
     final isSelected = _digitalWallet == value;
     return GestureDetector(
-      onTap: () => setState(() => _digitalWallet = value),
+      onTap: () => _cambiarBilletera(value), // Usamos el método de cambio
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -478,14 +594,23 @@ class _FacturaScreenState extends State<FacturaScreen> {
         width: double.infinity,
         height: 60,
         child: ElevatedButton(
-            onPressed: () => _validarYFinalizar(context, total, cart),
+            onPressed: _isProcessing
+                ? null
+                : () =>
+                    _validarYFinalizar(total, cart), // Sin parámetro context
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryP,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20))),
-            child: Text(text,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold))));
+            child: _isProcessing
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2.5))
+                : Text(text,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold))));
   }
 }

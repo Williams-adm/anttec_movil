@@ -1,9 +1,12 @@
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
+import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // Importante para la imagen
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -25,7 +28,21 @@ class _BoletaScreenState extends State<BoletaScreen> {
   final TextEditingController _opController = TextEditingController();
 
   final PrinterService _printerService = PrinterService();
+  final PaymentService _paymentService = PaymentService();
+
   double _vuelto = 0.0;
+  bool _isProcessing = false;
+
+  // Variables para manejar la imagen del QR
+  String? _qrImageUrl;
+  bool _isLoadingQr = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cargamos la imagen de Yape por defecto al iniciar
+    _cargarImagenQr('yape');
+  }
 
   @override
   void dispose() {
@@ -34,6 +51,31 @@ class _BoletaScreenState extends State<BoletaScreen> {
     _recibidoController.dispose();
     _opController.dispose();
     super.dispose();
+  }
+
+  // Metodo para cargar la imagen desde la API
+  Future<void> _cargarImagenQr(String wallet) async {
+    setState(() {
+      _isLoadingQr = true;
+      _qrImageUrl = null; // Limpiamos anterior
+    });
+
+    final url = await _paymentService.obtenerInfoBilletera(wallet);
+
+    if (mounted) {
+      setState(() {
+        _qrImageUrl = url;
+        _isLoadingQr = false;
+      });
+    }
+  }
+
+  // Metodo para cambiar de billetera (Yape <-> Plin)
+  void _cambiarBilletera(String wallet) {
+    if (_digitalWallet != wallet) {
+      setState(() => _digitalWallet = wallet);
+      _cargarImagenQr(wallet);
+    }
   }
 
   void _showCustomNotice(
@@ -79,8 +121,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     });
   }
 
-  void _validarYFinalizar(
-      BuildContext context, double total, CartProvider cart) {
+  void _validarYFinalizar(double total, CartProvider cart) async {
     if (_dniController.text.length != 8) {
       _showCustomNotice(
           message: "El DNI debe tener 8 dígitos",
@@ -95,6 +136,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
           color: Colors.orange[800]!);
       return;
     }
+
     if (_selectedPayment == 'efectivo') {
       double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
       if (recibido < total) {
@@ -104,19 +146,50 @@ class _BoletaScreenState extends State<BoletaScreen> {
             color: Colors.redAccent);
         return;
       }
+      _showSuccessDialog(total, cart);
+    } else if (_selectedPayment == 'yape') {
+      if (_opController.text.isEmpty) {
+        _showCustomNotice(
+            message: "Ingresa el Nro. de Operación",
+            icon: Symbols.qr_code_2,
+            color: Colors.blueAccent);
+        return;
+      }
+
+      setState(() => _isProcessing = true);
+
+      try {
+        await _paymentService.procesarPagoDigital(
+          wallet: _digitalWallet,
+          numeroOperacion: _opController.text,
+          monto: total,
+          nombreCliente: _nombreController.text,
+          documento: _dniController.text,
+        );
+
+        if (!mounted) return;
+
+        _showSuccessDialog(total, cart);
+      } on DioException catch (e) {
+        if (!mounted) return;
+        final message = e.error.toString();
+        _showCustomNotice(
+            message: message, icon: Symbols.error, color: Colors.red);
+      } catch (e) {
+        if (!mounted) return;
+        _showCustomNotice(
+            message: "Error desconocido: $e",
+            icon: Symbols.error,
+            color: Colors.red);
+      } finally {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+        }
+      }
     }
-    if (_selectedPayment == 'yape' && _opController.text.isEmpty) {
-      _showCustomNotice(
-          message: "Ingresa el Nro. de Operación",
-          icon: Symbols.qr_code_2,
-          color: Colors.blueAccent);
-      return;
-    }
-    _showSuccessDialog(context, total, cart);
   }
 
-  void _showSuccessDialog(
-      BuildContext context, double total, CartProvider cart) {
+  void _showSuccessDialog(double total, CartProvider cart) {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -182,7 +255,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
                   height: 55,
                   child: TextButton(
                     onPressed: () {
-                      cart.clearCart(); // ✅ Método ahora definido en Provider
+                      cart.clearCart();
                       ctx.go('/home');
                     },
                     style: TextButton.styleFrom(
@@ -318,98 +391,10 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
-  Widget _buildCashCalculator(double total) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-          color: AppColors.primaryS,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.primaryP.withValues(alpha: 0.1))),
-      child: Column(children: [
-        TextField(
-          controller: _recibidoController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
-          ],
-          onChanged: (_) => _calculateChange(total),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primaryP),
-          decoration: const InputDecoration(
-              hintText: "0.00",
-              labelText: "EFECTIVO RECIBIDO",
-              border: InputBorder.none,
-              floatingLabelBehavior: FloatingLabelBehavior.always),
-        ),
-        const Divider(),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text("VUELTO:",
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, color: AppColors.darkT)),
-          Text("S/. ${_vuelto.toStringAsFixed(2)}",
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: _vuelto > 0 ? Colors.green[700] : Colors.grey)),
-        ]),
-      ]),
-    );
-  }
+  // ... _buildCashCalculator, _buildInputField, _buildPaymentMiniCard ...
+  // MANTENER ESOS WIDGETS IGUALES AL CODIGO ANTERIOR
 
-  Widget _buildInputField(
-      {required String label,
-      required String hint,
-      required IconData icon,
-      required TextEditingController controller,
-      bool isNumeric = false,
-      int? maxLength}) {
-    return TextField(
-      controller: controller,
-      maxLength: maxLength,
-      inputFormatters: [
-        if (isNumeric) FilteringTextInputFormatter.digitsOnly,
-        if (maxLength != null) LengthLimitingTextInputFormatter(maxLength)
-      ],
-      decoration: InputDecoration(
-          counterText: "",
-          labelText: label,
-          hintText: hint,
-          prefixIcon: Icon(icon, color: AppColors.primaryP),
-          filled: true,
-          fillColor: AppColors.primaryS,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none)),
-    );
-  }
-
-  Widget _buildPaymentMiniCard(String title, IconData icon, String value) {
-    final isSelected = _selectedPayment == value;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedPayment = value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryP : AppColors.primaryS,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-                color: isSelected ? AppColors.primaryP : AppColors.tertiaryS)),
-        child: Column(children: [
-          Icon(icon, color: isSelected ? Colors.white : AppColors.primaryP),
-          const SizedBox(height: 5),
-          Text(title,
-              style: TextStyle(
-                  color: isSelected ? Colors.white : AppColors.extradarkT,
-                  fontWeight: FontWeight.bold)),
-        ]),
-      ),
-    );
-  }
-
+  // --- SECCION ACTUALIZADA: Selector de Billetera con Imagen ---
   Widget _buildDigitalWalletSelector(double total) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -428,11 +413,36 @@ class _BoletaScreenState extends State<BoletaScreen> {
                   "Plin", 'plin', const Color(0xFF00B4C5))),
         ]),
         const SizedBox(height: 25),
-        Icon(Symbols.qr_code_2,
-            size: 180,
-            color: _digitalWallet == 'yape'
-                ? const Color(0xFF742D87)
-                : const Color(0xFF00B4C5)),
+
+        // AQUI MOSTRAMOS LA IMAGEN O EL ICONO
+        _isLoadingQr
+            ? const SizedBox(
+                height: 180, child: Center(child: CircularProgressIndicator()))
+            : _qrImageUrl != null
+                ? Container(
+                    height: 250, // Altura para el QR
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300)),
+                    // Usamos CachedNetworkImage para optimizar
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: CachedNetworkImage(
+                        imageUrl: _qrImageUrl!,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) =>
+                            const Center(child: CircularProgressIndicator()),
+                        errorWidget: (context, url, error) =>
+                            const Icon(Symbols.broken_image, size: 50),
+                      ),
+                    ),
+                  )
+                : Icon(Symbols.qr_code_2,
+                    size: 180,
+                    color: _digitalWallet == 'yape'
+                        ? const Color(0xFF742D87)
+                        : const Color(0xFF00B4C5)),
+
         const SizedBox(height: 20),
         _buildInputField(
             label: "Nro. Operación",
@@ -447,7 +457,8 @@ class _BoletaScreenState extends State<BoletaScreen> {
   Widget _buildWalletTypeButton(String label, String value, Color activeColor) {
     final isSelected = _digitalWallet == value;
     return GestureDetector(
-      onTap: () => setState(() => _digitalWallet = value),
+      // AHORA LLAMAMOS A _cambiarBilletera en lugar de solo setState
+      onTap: () => _cambiarBilletera(value),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -461,6 +472,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
       ),
     );
   }
+
+  // Agrega aquí _buildSummaryBox, _buildActionButton, _buildCashCalculator, _buildPaymentMiniCard, _buildInputField
+  // (Estos son identicos a tu código previo, asegurate de incluirlos)
 
   Widget _buildSummaryBox(double total) {
     return Container(
@@ -486,15 +500,113 @@ class _BoletaScreenState extends State<BoletaScreen> {
         width: double.infinity,
         height: 60,
         child: ElevatedButton(
-          onPressed: () => _validarYFinalizar(context, total, cart),
-          style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryP,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20))),
-          child: Text(text,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ));
+            onPressed:
+                _isProcessing ? null : () => _validarYFinalizar(total, cart),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryP,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20))),
+            child: _isProcessing
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2.5))
+                : Text(text,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold))));
+  }
+
+  Widget _buildCashCalculator(double total) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+          color: AppColors.primaryS,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.primaryP.withValues(alpha: 0.1))),
+      child: Column(children: [
+        TextField(
+            controller: _recibidoController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+            ],
+            onChanged: (_) => _calculateChange(total),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: AppColors.primaryP),
+            decoration: const InputDecoration(
+                hintText: "0.00",
+                labelText: "EFECTIVO RECIBIDO",
+                border: InputBorder.none,
+                floatingLabelBehavior: FloatingLabelBehavior.always)),
+        const Divider(),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text("VUELTO:",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.darkT)),
+          Text("S/. ${_vuelto.toStringAsFixed(2)}",
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: _vuelto > 0 ? Colors.green[700] : Colors.grey)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildInputField(
+      {required String label,
+      required String hint,
+      required IconData icon,
+      required TextEditingController controller,
+      bool isNumeric = false,
+      int? maxLength,
+      Widget? suffix}) {
+    return TextField(
+        controller: controller,
+        maxLength: maxLength,
+        inputFormatters: [
+          if (isNumeric) FilteringTextInputFormatter.digitsOnly,
+          if (maxLength != null) LengthLimitingTextInputFormatter(maxLength)
+        ],
+        decoration: InputDecoration(
+            counterText: "",
+            labelText: label,
+            hintText: hint,
+            suffixIcon: suffix,
+            prefixIcon: Icon(icon, color: AppColors.primaryP),
+            filled: true,
+            fillColor: AppColors.primaryS,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none)));
+  }
+
+  Widget _buildPaymentMiniCard(String title, IconData icon, String value) {
+    final isSelected = _selectedPayment == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPayment = value),
+      child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          decoration: BoxDecoration(
+              color: isSelected ? AppColors.primaryP : AppColors.primaryS,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                  color:
+                      isSelected ? AppColors.primaryP : AppColors.tertiaryS)),
+          child: Column(children: [
+            Icon(icon, color: isSelected ? Colors.white : AppColors.primaryP),
+            const SizedBox(height: 5),
+            Text(title,
+                style: TextStyle(
+                    color: isSelected ? Colors.white : AppColors.extradarkT,
+                    fontWeight: FontWeight.bold))
+          ])),
+    );
   }
 }
