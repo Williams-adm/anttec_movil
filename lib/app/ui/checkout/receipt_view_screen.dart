@@ -1,10 +1,14 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // Necesario para limpiar el carrito
+import 'package:go_router/go_router.dart'; // Necesario para ir a /home
+import 'package:material_symbols_icons/symbols.dart';
+
+// --- IMPORTS PROPIOS ---
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
 import 'package:anttec_movil/app/ui/sales_report/screen/pdf_viewer_screen.dart';
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
-import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
-// Ya no necesitamos share_plus si borramos el botón de compartir
+import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart'; // Importa tu CartProvider
 
 class ReceiptViewScreen extends StatelessWidget {
   final Map<String, dynamic> saleData;
@@ -16,6 +20,7 @@ class ReceiptViewScreen extends StatelessWidget {
     required this.pdfPath,
   });
 
+  // 1. ABRIR PDF DETALLADO
   void _openPdfDetail(BuildContext context) {
     Navigator.push(
       context,
@@ -28,6 +33,7 @@ class ReceiptViewScreen extends StatelessWidget {
     );
   }
 
+  // 2. ABRIR SELECTOR DE IMPRESORA
   void _openPrinterSelector(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -62,15 +68,14 @@ class ReceiptViewScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        // 1. CORRECCIÓN: Quitamos la X y el botón compartir
-        automaticallyImplyLeading:
-            false, // Esto evita que salga la flecha o la X automáticamente
-        actions: [], // Sin botones a la derecha
+        // Bloqueamos volver atrás con la flecha o botón físico
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
         child: Column(
           children: [
+            // --- TICKET VISUAL ---
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -114,7 +119,6 @@ class ReceiptViewScreen extends StatelessWidget {
                   // Información
                   _buildInfoRow("Nro. Documento", saleData['id'] ?? '---'),
                   _buildInfoRow("Tipo", saleData['type'] ?? 'Comprobante'),
-                  // Aquí se usa el método corregido para nombres largos
                   _buildInfoRow("Cliente",
                       saleData['customer_name'] ?? 'Público General'),
 
@@ -192,7 +196,7 @@ class ReceiptViewScreen extends StatelessWidget {
 
                   const SizedBox(height: 40),
 
-                  // Decoración corte papel
+                  // Decoración
                   Row(
                       children: List.generate(
                           20,
@@ -215,7 +219,9 @@ class ReceiptViewScreen extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // BOTONES
+            // --- BOTONES ---
+
+            // 1. VER PDF
             ElevatedButton.icon(
               onPressed: () => _openPdfDetail(context),
               icon: const Icon(Symbols.picture_as_pdf, color: Colors.white),
@@ -235,6 +241,7 @@ class ReceiptViewScreen extends StatelessWidget {
 
             const SizedBox(height: 15),
 
+            // 2. IMPRIMIR
             ElevatedButton.icon(
               onPressed: () => _openPrinterSelector(context),
               icon: const Icon(Symbols.print, color: Colors.white),
@@ -254,8 +261,14 @@ class ReceiptViewScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
+            // 3. REGRESAR AL INICIO (CORREGIDO)
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                // IMPORTANTE: Limpiamos el carrito
+                context.read<CartProvider>().clearCart();
+                // IMPORTANTE: Vamos a Home eliminando el historial
+                context.go('/home');
+              },
               child: const Text("REGRESAR AL INICIO",
                   style: TextStyle(
                       color: Colors.black54, fontWeight: FontWeight.bold)),
@@ -266,33 +279,26 @@ class ReceiptViewScreen extends StatelessWidget {
     );
   }
 
-  // 2. CORRECCIÓN: Método mejorado para evitar OVERFLOW
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 5),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment:
-            CrossAxisAlignment.start, // Alinea arriba si hay salto de línea
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Label (izquierda)
           Text(label,
               style: const TextStyle(color: Colors.black54, fontSize: 13)),
-
-          const SizedBox(width: 15), // Espacio vital para que no se peguen
-
-          // Value (derecha) - EXPANDED SOLUCIONA EL OVERFLOW
+          const SizedBox(width: 15),
           Expanded(
             child: Text(
               value,
-              textAlign: TextAlign.right, // Alinea el texto a la derecha
+              textAlign: TextAlign.right,
               style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                   color: Colors.black87),
-              maxLines: 2, // Permite hasta 2 líneas si es muy largo
-              overflow:
-                  TextOverflow.ellipsis, // Pone "..." si es demasiado largo
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

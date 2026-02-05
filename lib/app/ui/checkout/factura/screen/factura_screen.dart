@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 // --- RUTAS DE WIDGETS ---
-import 'package:anttec_movil/app/ui/checkout/boleta/widgets/boleta_widgets.dart'; // Trae AmountSummary y BoletaFooter
+import 'package:anttec_movil/app/ui/checkout/boleta/widgets/boleta_widgets.dart';
+import 'package:anttec_movil/app/ui/checkout/factura/widgets/factura_widgets.dart';
 import 'package:anttec_movil/app/ui/checkout/receipt_view_screen.dart';
 
-// --- SERVICIOS ---
+// --- RUTAS DE SERVICIOS ---
 import 'package:anttec_movil/data/services/api/v1/sales_service.dart';
 import 'package:anttec_movil/data/services/api/v1/customer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
@@ -19,24 +20,23 @@ import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-class BoletaScreen extends StatefulWidget {
-  const BoletaScreen({super.key});
+class FacturaScreen extends StatefulWidget {
+  const FacturaScreen({super.key});
 
   @override
-  State<BoletaScreen> createState() => _BoletaScreenState();
+  State<FacturaScreen> createState() => _FacturaScreenState();
 }
 
-class _BoletaScreenState extends State<BoletaScreen> {
+class _FacturaScreenState extends State<FacturaScreen> {
   // --- ESTADO ---
   String _selectedPayment = 'efectivo';
   String _digitalWallet = 'yape';
   String _selectedOtherType = 'card';
-  String _tipoDocumento = 'DNI';
 
   // --- CONTROLADORES ---
-  final _docNumberController = TextEditingController();
-  final _nombreController = TextEditingController();
-  final _apellidoController = TextEditingController();
+  final _rucController = TextEditingController();
+  final _razonSocialController = TextEditingController();
+  final _direccionController = TextEditingController();
   final _recibidoController = TextEditingController();
   final _opController = TextEditingController();
   final _referenceController = TextEditingController();
@@ -49,7 +49,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
   // --- VARIABLES LÓGICAS ---
   double _vuelto = 0.0;
   bool _isProcessing = false;
-  bool _isSearchingDni = false;
+  bool _isSearchingRuc = false;
   String? _qrImageUrl;
   bool _isLoadingQr = false;
   String? _pdfPath;
@@ -62,9 +62,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
   @override
   void dispose() {
-    _docNumberController.dispose();
-    _nombreController.dispose();
-    _apellidoController.dispose();
+    _rucController.dispose();
+    _razonSocialController.dispose();
+    _direccionController.dispose();
     _recibidoController.dispose();
     _opController.dispose();
     _referenceController.dispose();
@@ -73,23 +73,39 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
   // --- LÓGICA DE NEGOCIO ---
 
-  Future<void> _buscarDni() async {
-    final dni = _docNumberController.text.trim();
-    if (dni.length != 8) {
-      _showNotice("DNI debe tener 8 dígitos", Symbols.warning, Colors.orange);
+  Future<void> _buscarRuc() async {
+    final ruc = _rucController.text.trim();
+
+    if (ruc.isEmpty) {
+      _showNotice("Ingrese un número de RUC", Symbols.keyboard, Colors.orange);
       return;
     }
-    setState(() => _isSearchingDni = true);
+    if (ruc.length != 11) {
+      _showNotice(
+          "El RUC debe tener 11 dígitos", Symbols.warning, Colors.orange);
+      return;
+    }
+
+    setState(() => _isSearchingRuc = true);
+
     try {
-      final data = await _customerService.consultarDni(dni);
+      final data = await _customerService.consultarRuc(ruc);
       if (mounted && data != null) {
         setState(() {
-          _nombreController.text = data['name'] ?? '';
-          _apellidoController.text = data['last_name'] ?? '';
+          _razonSocialController.text = data['business_name'] ?? '';
+          _direccionController.text = data['tax_address'] ?? '';
         });
+        _showNotice(
+            "Datos de empresa encontrados", Symbols.check_circle, Colors.green);
+      } else {
+        _showNotice("No se encontró información del RUC", Symbols.search_off,
+            Colors.red);
       }
+    } catch (e) {
+      _showNotice(
+          "Error de conexión al buscar RUC", Symbols.wifi_off, Colors.red);
     } finally {
-      if (mounted) setState(() => _isSearchingDni = false);
+      if (mounted) setState(() => _isSearchingRuc = false);
     }
   }
 
@@ -115,23 +131,33 @@ class _BoletaScreenState extends State<BoletaScreen> {
     });
   }
 
+  // --- VALIDACIÓN Y FINALIZACIÓN ---
+
   Future<void> _validarYFinalizar(double total, CartProvider cart) async {
-    // 1. Validaciones
-    final docLen = _docNumberController.text.length;
-    if (_tipoDocumento == 'DNI' && docLen != 8) {
-      _showNotice("DNI incorrecto", Symbols.error, Colors.red);
+    final rucText = _rucController.text.trim();
+
+    // 1. VALIDACIONES DE EMPRESA
+    if (rucText.isEmpty) {
+      _showNotice(
+          "Ingrese el RUC de la empresa", Symbols.domain, Colors.orange);
       return;
     }
-    if (_tipoDocumento == 'CE' && (docLen < 8 || docLen > 12)) {
-      _showNotice("CE inválido", Symbols.error, Colors.red);
+    if (rucText.length != 11) {
+      _showNotice(
+          "RUC inválido (Debe ser 11 dígitos)", Symbols.error, Colors.red);
       return;
     }
-    if (_nombreController.text.isEmpty || _apellidoController.text.isEmpty) {
-      _showNotice("Complete datos del cliente", Symbols.person, Colors.orange);
+    if (_razonSocialController.text.trim().isEmpty) {
+      _showNotice("Falta la Razón Social", Symbols.business, Colors.orange);
+      return;
+    }
+    if (_direccionController.text.trim().isEmpty) {
+      _showNotice(
+          "Falta la Dirección Fiscal", Symbols.location_on, Colors.orange);
       return;
     }
 
-    // 2. Preparar Pago
+    // 2. VALIDACIONES DE PAGO
     String paymentMethod = '';
     String? paymentCode;
     double? cashAmount;
@@ -140,33 +166,38 @@ class _BoletaScreenState extends State<BoletaScreen> {
       double recibido =
           double.tryParse(_recibidoController.text.replaceAll(',', '.')) ?? 0.0;
       if (recibido < total) {
-        _showNotice("Pago insuficiente", Symbols.money_off, Colors.red);
+        _showNotice("Efectivo insuficiente", Symbols.money_off, Colors.red);
         return;
       }
       paymentMethod = 'cash';
       cashAmount = recibido;
     } else if (_selectedPayment == 'yape') {
-      if (_opController.text.isEmpty) {
-        _showNotice("Falta Nro Operación", Symbols.qr_code, Colors.orange);
+      if (_opController.text.trim().isEmpty) {
+        _showNotice("Falta Nro. de Operación", Symbols.qr_code_2, Colors.blue);
         return;
       }
       paymentMethod = _digitalWallet;
       paymentCode = _opController.text;
     } else {
+      if (_referenceController.text.trim().isEmpty) {
+        _showNotice(
+            "Falta Código de Referencia", Symbols.receipt_long, Colors.blue);
+        return;
+      }
       paymentMethod = _selectedOtherType;
       paymentCode = _referenceController.text;
     }
 
     setState(() => _isProcessing = true);
 
-    // 3. Crear Objeto
+    // 3. ARMADO DEL OBJETO
     final orderData = {
-      "type_voucher": "boleta",
-      "document_type": _tipoDocumento,
-      "document_number": int.tryParse(_docNumberController.text) ?? 0,
+      "type_voucher": "factura",
+      "document_type": "RUC",
+      "document_number": int.tryParse(rucText) ?? 0,
       "customer": {
-        "name": _nombreController.text,
-        "last_name": _apellidoController.text
+        "business_name": _razonSocialController.text.trim(),
+        "tax_address": _direccionController.text.trim(),
       },
       "payment_method": paymentMethod,
       if (paymentCode != null) "payment_method_code": paymentCode,
@@ -182,7 +213,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
       "total": total
     };
 
-    // 4. Enviar
+    // 4. ENVÍO
     try {
       final res = await _salesService.createOrder(orderData);
 
@@ -197,7 +228,8 @@ class _BoletaScreenState extends State<BoletaScreen> {
       }
       _showSuccessDialog(total, cart);
     } catch (e) {
-      _showNotice("Error al procesar venta", Symbols.wifi_off, Colors.red);
+      _showNotice(
+          "Error al procesar la factura", Symbols.cloud_off, Colors.red);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -211,40 +243,27 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
     return Scaffold(
       appBar: AppBar(
-          title: const Text("Finalizar Boleta",
+          title: const Text("Venta: Factura",
               style: TextStyle(fontWeight: FontWeight.w900))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. CLIENTE
-            const Text("Datos del Cliente",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.extradarkT)),
-            const SizedBox(height: 15),
-
-            ClientHeaderSection(
-              tipoDocumento: _tipoDocumento,
-              onTypeChanged: (val) {
-                setState(() => _tipoDocumento = val);
-                _docNumberController.clear();
-              },
-              docController: _docNumberController,
-              isSearching: _isSearchingDni,
-              onSearch: _buscarDni,
-            ),
+            // 1. CABECERA
+            CompanyHeaderSection(
+                rucController: _rucController,
+                isSearching: _isSearchingRuc,
+                onSearch: _buscarRuc),
 
             BoletaInputField(
-                label: "Nombres",
-                icon: Symbols.person,
-                controller: _nombreController),
+                label: "Razón Social",
+                icon: Symbols.business,
+                controller: _razonSocialController),
             BoletaInputField(
-                label: "Apellidos",
-                icon: Symbols.person_add,
-                controller: _apellidoController),
+                label: "Dirección Fiscal",
+                icon: Symbols.location_on,
+                controller: _direccionController),
 
             const SizedBox(height: 35),
 
@@ -282,18 +301,18 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
             if (_selectedPayment == 'otros')
               OtherPaymentPanel(
-                  selectedType: _selectedOtherType,
-                  onTypeChanged: (v) => setState(() => _selectedOtherType = v),
-                  refController: _referenceController),
+                selectedType: _selectedOtherType,
+                onTypeChanged: (v) => setState(() => _selectedOtherType = v),
+                refController: _referenceController,
+              ),
 
             const SizedBox(height: 30),
 
-            // 3. RESUMEN DEL MONTO (AQUÍ ESTABA EL ERROR)
-            AmountSummary(total: total), // <-- ¡Esta línea faltaba!
+            AmountSummary(total: total),
 
             const SizedBox(height: 30),
 
-            // 4. FOOTER
+            // 3. FOOTER
             BoletaFooter(
                 total: total,
                 isProcessing: _isProcessing,
@@ -306,6 +325,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
   }
 
   // --- UTILIDADES ---
+
   void _showNotice(String msg, IconData icon, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       backgroundColor: color,
@@ -313,7 +333,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
       content: Row(children: [
         Icon(icon, color: Colors.white),
         const SizedBox(width: 10),
-        Text(msg)
+        Expanded(
+            child:
+                Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)))
       ]),
     ));
   }
@@ -324,8 +346,8 @@ class _BoletaScreenState extends State<BoletaScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Venta Exitosa", textAlign: TextAlign.center),
-        content: const Text("La boleta se ha generado correctamente.",
+        title: const Text("¡Factura Emitida!", textAlign: TextAlign.center),
+        content: const Text("El comprobante se ha generado exitosamente.",
             textAlign: TextAlign.center),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
@@ -338,12 +360,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
                     MaterialPageRoute(
                         builder: (_) =>
                             ReceiptViewScreen(pdfPath: _pdfPath!, saleData: {
-                              'id': 'B001-NEW',
-                              'type': 'Boleta',
+                              'id': 'F001-NEW',
+                              'type': 'Factura',
                               'amount': total,
                               'date': 'Ahora',
-                              'customer_name':
-                                  '${_nombreController.text} ${_apellidoController.text}',
+                              'customer_name': _razonSocialController.text,
                               'items': cart.items
                                   .map((e) => {
                                         'qty': e.quantity,
@@ -355,7 +376,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
               }
             },
             icon: const Icon(Symbols.visibility),
-            label: const Text("VER BOLETA"),
+            label: const Text("VER FACTURA"),
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryP,
                 foregroundColor: Colors.white),

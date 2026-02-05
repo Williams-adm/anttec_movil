@@ -49,7 +49,7 @@ class BoletaInputField extends StatelessWidget {
   }
 }
 
-// --- B. SELECTOR DNI / CARNET DE EXTRANJERÍA ---
+// --- B. SELECTOR DNI / CARNET DE EXTRANJERÍA (Para Boleta) ---
 class ClientHeaderSection extends StatelessWidget {
   final String tipoDocumento;
   final Function(String) onTypeChanged;
@@ -70,7 +70,6 @@ class ClientHeaderSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Selector Tipo
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
@@ -85,7 +84,6 @@ class ClientHeaderSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 15),
-        // Input Documento + Botón Buscar
         Row(
           children: [
             Expanded(
@@ -98,7 +96,6 @@ class ClientHeaderSection extends StatelessWidget {
                 maxLength: tipoDocumento == 'DNI' ? 8 : 12,
               ),
             ),
-            // Solo mostramos botón buscar para DNI (RENIEC)
             if (tipoDocumento == 'DNI') ...[
               const SizedBox(width: 10),
               GestureDetector(
@@ -244,7 +241,6 @@ class CashPaymentPanel extends StatelessWidget {
           TextField(
             controller: controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            // Regex para permitir solo números y un punto decimal
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d*'))
             ],
@@ -440,7 +436,40 @@ class OtherPaymentPanel extends StatelessWidget {
   }
 }
 
-// --- E. FOOTER Y BOTÓN FINAL ---
+// --- E. RESUMEN DE MONTO ---
+class AmountSummary extends StatelessWidget {
+  final double total;
+  const AmountSummary({super.key, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.primaryS,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text("Monto Final:",
+              style: TextStyle(
+                  fontWeight: FontWeight.w600, color: AppColors.semidarkT)),
+          Text(
+            "S/. ${total.toStringAsFixed(2)}",
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.primaryP,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- F. FOOTER Y BOTÓN FINAL ---
 class BoletaFooter extends StatelessWidget {
   final double total;
   final bool isProcessing;
@@ -455,51 +484,22 @@ class BoletaFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.primaryS,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Monto Final:",
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600, color: AppColors.semidarkT)),
-              Text(
-                "S/. ${total.toStringAsFixed(2)}",
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primaryP,
-                ),
-              ),
-            ],
-          ),
+    return SizedBox(
+      width: double.infinity,
+      height: 60,
+      child: ElevatedButton(
+        onPressed: isProcessing ? null : onProcess,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryP,
+          foregroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
-        const SizedBox(height: 30),
-        SizedBox(
-          width: double.infinity,
-          height: 60,
-          child: ElevatedButton(
-            onPressed: isProcessing ? null : onProcess,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryP,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-            ),
-            child: isProcessing
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text("REALIZAR VENTA",
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ),
-        ),
-      ],
+        child: isProcessing
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text("REALIZAR VENTA",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      ),
     );
   }
 }
