@@ -1,3 +1,4 @@
+import 'package:anttec_movil/data/services/api/v1/customer_service.dart'; // <--- IMPORTANTE
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
@@ -6,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // Importante para la imagen
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -19,45 +20,105 @@ class BoletaScreen extends StatefulWidget {
 }
 
 class _BoletaScreenState extends State<BoletaScreen> {
+  // Configuración de Pago
   String _selectedPayment = 'efectivo';
   String _digitalWallet = 'yape';
 
-  final TextEditingController _dniController = TextEditingController();
+  // Configuración de Cliente
+  String _tipoDocumento = 'DNI'; // Opciones: 'DNI', 'CE'
+
+  final TextEditingController _docNumberController = TextEditingController();
   final TextEditingController _nombreController = TextEditingController();
+  final TextEditingController _apellidoController =
+      TextEditingController(); // Nuevo campo
+
   final TextEditingController _recibidoController = TextEditingController();
   final TextEditingController _opController = TextEditingController();
 
+  // Servicios
   final PrinterService _printerService = PrinterService();
   final PaymentService _paymentService = PaymentService();
+  final CustomerService _customerService = CustomerService(); // Nuevo servicio
 
   double _vuelto = 0.0;
   bool _isProcessing = false;
+  bool _isSearchingDni = false; // Para el loading del botón de búsqueda
 
-  // Variables para manejar la imagen del QR
+  // Variables QR
   String? _qrImageUrl;
   bool _isLoadingQr = false;
 
   @override
   void initState() {
     super.initState();
-    // Cargamos la imagen de Yape por defecto al iniciar
     _cargarImagenQr('yape');
   }
 
   @override
   void dispose() {
-    _dniController.dispose();
+    _docNumberController.dispose();
     _nombreController.dispose();
+    _apellidoController.dispose();
     _recibidoController.dispose();
     _opController.dispose();
     super.dispose();
   }
 
-  // Metodo para cargar la imagen desde la API
+  // --- LOGICA BUSQUEDA DNI ---
+  Future<void> _buscarDni() async {
+    final dni = _docNumberController.text.trim();
+    if (dni.length != 8) {
+      _showCustomNotice(
+          message: "El DNI debe tener 8 dígitos",
+          icon: Symbols.warning,
+          color: Colors.orange);
+      return;
+    }
+
+    setState(() => _isSearchingDni = true);
+
+    // Limpiamos campos antes de buscar
+    _nombreController.clear();
+    _apellidoController.clear();
+
+    try {
+      final data = await _customerService.consultarDni(dni);
+
+      if (!mounted) return;
+
+      if (data != null) {
+        // La API devuelve: name, last_name, document_number
+        setState(() {
+          _nombreController.text = data['name'] ?? '';
+          _apellidoController.text = data['last_name'] ?? '';
+        });
+        _showCustomNotice(
+            message: "Datos encontrados",
+            icon: Symbols.check_circle,
+            color: Colors.green);
+      } else {
+        _showCustomNotice(
+            message: "DNI no encontrado en RENIEC",
+            icon: Symbols.error,
+            color: Colors.redAccent);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showCustomNotice(
+            message: "Error de conexión",
+            icon: Symbols.wifi_off,
+            color: Colors.red);
+      }
+    } finally {
+      if (mounted) setState(() => _isSearchingDni = false);
+    }
+  }
+
+  // --- LOGICA IMAGEN QR ---
   Future<void> _cargarImagenQr(String wallet) async {
     setState(() {
       _isLoadingQr = true;
-      _qrImageUrl = null; // Limpiamos anterior
+      _qrImageUrl = null;
     });
 
     final url = await _paymentService.obtenerInfoBilletera(wallet);
@@ -70,7 +131,6 @@ class _BoletaScreenState extends State<BoletaScreen> {
     }
   }
 
-  // Metodo para cambiar de billetera (Yape <-> Plin)
   void _cambiarBilletera(String wallet) {
     if (_digitalWallet != wallet) {
       setState(() => _digitalWallet = wallet);
@@ -78,6 +138,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     }
   }
 
+  // --- LOGICA GENERAL UI ---
   void _showCustomNotice(
       {required String message, required IconData icon, required Color color}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -85,6 +146,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
         elevation: 0,
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.transparent,
+        duration: const Duration(milliseconds: 2000),
         content: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -122,20 +184,27 @@ class _BoletaScreenState extends State<BoletaScreen> {
   }
 
   void _validarYFinalizar(double total, CartProvider cart) async {
-    if (_dniController.text.length != 8) {
+    // Validaciones
+    int largoDoc = _tipoDocumento == 'DNI' ? 8 : 12; // CE suele ser hasta 12
+    if (_docNumberController.text.length < 8) {
       _showCustomNotice(
-          message: "El DNI debe tener 8 dígitos",
+          message: "Documento inválido",
           icon: Symbols.info,
-          color: Colors.orange[800]!);
+          color: Colors.orange);
       return;
     }
-    if (_nombreController.text.trim().isEmpty) {
+
+    if (_nombreController.text.trim().isEmpty ||
+        _apellidoController.text.trim().isEmpty) {
       _showCustomNotice(
-          message: "Ingresa el nombre del cliente",
+          message: "Complete Nombres y Apellidos",
           icon: Symbols.person_alert,
-          color: Colors.orange[800]!);
+          color: Colors.orange);
       return;
     }
+
+    String nombreCompleto =
+        "${_nombreController.text} ${_apellidoController.text}";
 
     if (_selectedPayment == 'efectivo') {
       double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
@@ -150,7 +219,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
     } else if (_selectedPayment == 'yape') {
       if (_opController.text.isEmpty) {
         _showCustomNotice(
-            message: "Ingresa el Nro. de Operación",
+            message: "Falta Nro. Operación",
             icon: Symbols.qr_code_2,
             color: Colors.blueAccent);
         return;
@@ -163,12 +232,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
           wallet: _digitalWallet,
           numeroOperacion: _opController.text,
           monto: total,
-          nombreCliente: _nombreController.text,
-          documento: _dniController.text,
+          nombreCliente: nombreCompleto,
+          documento: _docNumberController.text,
         );
 
         if (!mounted) return;
-
         _showSuccessDialog(total, cart);
       } on DioException catch (e) {
         if (!mounted) return;
@@ -178,18 +246,18 @@ class _BoletaScreenState extends State<BoletaScreen> {
       } catch (e) {
         if (!mounted) return;
         _showCustomNotice(
-            message: "Error desconocido: $e",
-            icon: Symbols.error,
-            color: Colors.red);
+            message: "Error: $e", icon: Symbols.error, color: Colors.red);
       } finally {
-        if (mounted) {
-          setState(() => _isProcessing = false);
-        }
+        if (mounted) setState(() => _isProcessing = false);
       }
     }
   }
 
+  // ... _showSuccessDialog, _abrirSelectorImpresora, _imprimir ...
+  // (Mantener igual que antes, solo asegúrate de pasar 'nombreCompleto' si lo usas en el ticket)
+  // Por brevedad, asumo que usas los mismos métodos de impresión de la respuesta anterior.
   void _showSuccessDialog(double total, CartProvider cart) {
+    // ... (Mismo código de tu showGeneralDialog anterior)
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -346,19 +414,49 @@ class _BoletaScreenState extends State<BoletaScreen> {
                     fontWeight: FontWeight.w900,
                     color: AppColors.extradarkT)),
             const SizedBox(height: 15),
-            _buildInputField(
-                label: "DNI",
-                hint: "8 dígitos",
-                icon: Symbols.badge,
-                controller: _dniController,
-                isNumeric: true,
-                maxLength: 8),
+
+            // --- SELECTOR TIPO DOCUMENTO ---
+            _buildDocumentTypeSelector(),
             const SizedBox(height: 15),
+
+            // --- INPUT DOCUMENTO CON BOTON DE BUSQUEDA ---
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildInputField(
+                    label: _tipoDocumento == 'DNI' ? "DNI" : "Carnet Ext.",
+                    hint: _tipoDocumento == 'DNI'
+                        ? "8 dígitos"
+                        : "Hasta 12 dígitos",
+                    icon: Symbols.badge,
+                    controller: _docNumberController,
+                    isNumeric: true,
+                    maxLength: _tipoDocumento == 'DNI' ? 8 : 12,
+                  ),
+                ),
+                if (_tipoDocumento == 'DNI') ...[
+                  const SizedBox(width: 10),
+                  _buildSearchButton(),
+                ]
+              ],
+            ),
+
+            const SizedBox(height: 15),
+
+            // --- NOMBRES Y APELLIDOS SEPARADOS ---
             _buildInputField(
                 label: "Nombres",
-                hint: "Nombre completo",
+                hint: "Ingrese nombres",
                 icon: Symbols.person,
                 controller: _nombreController),
+            const SizedBox(height: 15),
+            _buildInputField(
+                label: "Apellidos",
+                hint: "Ingrese apellidos",
+                icon: Symbols.person_add, // Icono diferente para variar
+                controller: _apellidoController),
+
             const SizedBox(height: 30),
             const Text("Método de Pago",
                 style: TextStyle(
@@ -391,132 +489,80 @@ class _BoletaScreenState extends State<BoletaScreen> {
     );
   }
 
-  // ... _buildCashCalculator, _buildInputField, _buildPaymentMiniCard ...
-  // MANTENER ESOS WIDGETS IGUALES AL CODIGO ANTERIOR
+  // --- WIDGETS NUEVOS ---
 
-  // --- SECCION ACTUALIZADA: Selector de Billetera con Imagen ---
-  Widget _buildDigitalWalletSelector(double total) {
+  Widget _buildDocumentTypeSelector() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-          color: AppColors.primaryS,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.tertiaryS)),
-      child: Column(children: [
-        Row(children: [
-          Expanded(
-              child: _buildWalletTypeButton(
-                  "Yape", 'yape', const Color(0xFF742D87))),
-          const SizedBox(width: 10),
-          Expanded(
-              child: _buildWalletTypeButton(
-                  "Plin", 'plin', const Color(0xFF00B4C5))),
-        ]),
-        const SizedBox(height: 25),
-
-        // AQUI MOSTRAMOS LA IMAGEN O EL ICONO
-        _isLoadingQr
-            ? const SizedBox(
-                height: 180, child: Center(child: CircularProgressIndicator()))
-            : _qrImageUrl != null
-                ? Container(
-                    height: 250, // Altura para el QR
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: Colors.grey.shade300)),
-                    // Usamos CachedNetworkImage para optimizar
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: CachedNetworkImage(
-                        imageUrl: _qrImageUrl!,
-                        fit: BoxFit.contain,
-                        placeholder: (context, url) =>
-                            const Center(child: CircularProgressIndicator()),
-                        errorWidget: (context, url, error) =>
-                            const Icon(Symbols.broken_image, size: 50),
-                      ),
-                    ),
-                  )
-                : Icon(Symbols.qr_code_2,
-                    size: 180,
-                    color: _digitalWallet == 'yape'
-                        ? const Color(0xFF742D87)
-                        : const Color(0xFF00B4C5)),
-
-        const SizedBox(height: 20),
-        _buildInputField(
-            label: "Nro. Operación",
-            hint: "000000",
-            icon: Symbols.receipt_long,
-            controller: _opController,
-            isNumeric: true),
-      ]),
-    );
-  }
-
-  Widget _buildWalletTypeButton(String label, String value, Color activeColor) {
-    final isSelected = _digitalWallet == value;
-    return GestureDetector(
-      // AHORA LLAMAMOS A _cambiarBilletera en lugar de solo setState
-      onTap: () => _cambiarBilletera(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-            color: isSelected ? activeColor : AppColors.background,
-            borderRadius: BorderRadius.circular(12)),
-        child: Center(
-            child: Text(label,
-                style: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.semidarkT,
-                    fontWeight: FontWeight.bold))),
+        color: AppColors.primaryS,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _buildDocTypeButton('DNI')),
+          Expanded(child: _buildDocTypeButton('CE')),
+        ],
       ),
     );
   }
 
-  // Agrega aquí _buildSummaryBox, _buildActionButton, _buildCashCalculator, _buildPaymentMiniCard, _buildInputField
-  // (Estos son identicos a tu código previo, asegurate de incluirlos)
-
-  Widget _buildSummaryBox(double total) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-          color: AppColors.primaryS, borderRadius: BorderRadius.circular(20)),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text("Monto Final:",
+  Widget _buildDocTypeButton(String type) {
+    bool isSelected = _tipoDocumento == type;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _tipoDocumento = type;
+          _docNumberController.clear();
+          _nombreController.clear();
+          _apellidoController.clear();
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryP : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            type,
             style: TextStyle(
-                fontWeight: FontWeight.w600, color: AppColors.semidarkT)),
-        Text("S/. ${total.toStringAsFixed(2)}",
-            style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primaryP)),
-      ]),
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : AppColors.semidarkT,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildActionButton(
-      BuildContext context, String text, double total, CartProvider cart) {
-    return SizedBox(
-        width: double.infinity,
-        height: 60,
-        child: ElevatedButton(
-            onPressed:
-                _isProcessing ? null : () => _validarYFinalizar(total, cart),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryP,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20))),
-            child: _isProcessing
-                ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5))
-                : Text(text,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold))));
+  Widget _buildSearchButton() {
+    return GestureDetector(
+      onTap: _isSearchingDni ? null : _buscarDni,
+      child: Container(
+        height: 56, // Altura estándar del input field
+        width: 56,
+        decoration: BoxDecoration(
+          color: AppColors.primaryP,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: _isSearchingDni
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2))
+              : const Icon(Symbols.search, color: Colors.white),
+        ),
+      ),
+    );
   }
+
+  // --- WIDGETS EXISTENTES (Mantener) ---
+  // (Solo asegúrate de que _buildInputField use el maxLength que le pasamos)
 
   Widget _buildCashCalculator(double total) {
     return Container(
@@ -608,5 +654,121 @@ class _BoletaScreenState extends State<BoletaScreen> {
                     fontWeight: FontWeight.bold))
           ])),
     );
+  }
+
+  Widget _buildDigitalWalletSelector(double total) {
+    // ... (Mantener implementación previa con _qrImageUrl)
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: AppColors.primaryS,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.tertiaryS)),
+      child: Column(children: [
+        Row(children: [
+          Expanded(
+              child: _buildWalletTypeButton(
+                  "Yape", 'yape', const Color(0xFF742D87))),
+          const SizedBox(width: 10),
+          Expanded(
+              child: _buildWalletTypeButton(
+                  "Plin", 'plin', const Color(0xFF00B4C5))),
+        ]),
+        const SizedBox(height: 25),
+        _isLoadingQr
+            ? const SizedBox(
+                height: 180, child: Center(child: CircularProgressIndicator()))
+            : _qrImageUrl != null
+                ? Container(
+                    height: 250,
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey.shade300)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: CachedNetworkImage(
+                        imageUrl: _qrImageUrl!,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) =>
+                            const Center(child: CircularProgressIndicator()),
+                        errorWidget: (context, url, error) =>
+                            const Icon(Symbols.broken_image, size: 50),
+                      ),
+                    ),
+                  )
+                : Icon(Symbols.qr_code_2,
+                    size: 180,
+                    color: _digitalWallet == 'yape'
+                        ? const Color(0xFF742D87)
+                        : const Color(0xFF00B4C5)),
+        const SizedBox(height: 20),
+        _buildInputField(
+            label: "Nro. Operación",
+            hint: "000000",
+            icon: Symbols.receipt_long,
+            controller: _opController,
+            isNumeric: true),
+      ]),
+    );
+  }
+
+  Widget _buildWalletTypeButton(String label, String value, Color activeColor) {
+    final isSelected = _digitalWallet == value;
+    return GestureDetector(
+      onTap: () => _cambiarBilletera(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+            color: isSelected ? activeColor : AppColors.background,
+            borderRadius: BorderRadius.circular(12)),
+        child: Center(
+            child: Text(label,
+                style: TextStyle(
+                    color: isSelected ? Colors.white : AppColors.semidarkT,
+                    fontWeight: FontWeight.bold))),
+      ),
+    );
+  }
+
+  Widget _buildSummaryBox(double total) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: AppColors.primaryS, borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text("Monto Final:",
+            style: TextStyle(
+                fontWeight: FontWeight.w600, color: AppColors.semidarkT)),
+        Text("S/. ${total.toStringAsFixed(2)}",
+            style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.primaryP)),
+      ]),
+    );
+  }
+
+  Widget _buildActionButton(
+      BuildContext context, String text, double total, CartProvider cart) {
+    return SizedBox(
+        width: double.infinity,
+        height: 60,
+        child: ElevatedButton(
+            onPressed:
+                _isProcessing ? null : () => _validarYFinalizar(total, cart),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryP,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20))),
+            child: _isProcessing
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2.5))
+                : Text(text,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold))));
   }
 }
