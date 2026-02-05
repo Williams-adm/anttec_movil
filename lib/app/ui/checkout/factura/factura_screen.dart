@@ -1,4 +1,4 @@
-import 'package:anttec_movil/data/services/api/v1/customer_service.dart'; // Nuevo servicio
+import 'package:anttec_movil/data/services/api/v1/customer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
@@ -23,6 +23,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
   // Configuración de Pago
   String _selectedPayment = 'efectivo';
   String _digitalWallet = 'yape';
+  String _selectedOtherType = 'card';
 
   final TextEditingController _rucController = TextEditingController();
   final TextEditingController _razonSocialController = TextEditingController();
@@ -30,18 +31,16 @@ class _FacturaScreenState extends State<FacturaScreen> {
 
   final TextEditingController _recibidoController = TextEditingController();
   final TextEditingController _opController = TextEditingController();
+  final TextEditingController _referenceController = TextEditingController();
 
-  // Servicios
   final PrinterService _printerService = PrinterService();
   final PaymentService _paymentService = PaymentService();
-  final CustomerService _customerService =
-      CustomerService(); // Instancia servicio clientes
+  final CustomerService _customerService = CustomerService();
 
   double _vuelto = 0.0;
   bool _isProcessing = false;
-  bool _isSearchingRuc = false; // Estado de carga para búsqueda RUC
+  bool _isSearchingRuc = false;
 
-  // Variables QR
   String? _qrImageUrl;
   bool _isLoadingQr = false;
 
@@ -58,6 +57,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
     _direccionController.dispose();
     _recibidoController.dispose();
     _opController.dispose();
+    _referenceController.dispose();
     super.dispose();
   }
 
@@ -73,18 +73,14 @@ class _FacturaScreenState extends State<FacturaScreen> {
     }
 
     setState(() => _isSearchingRuc = true);
-
-    // Limpiamos campos para evitar confusión
     _razonSocialController.clear();
     _direccionController.clear();
 
     try {
       final data = await _customerService.consultarRuc(ruc);
-
       if (!mounted) return;
 
       if (data != null) {
-        // Mapeamos la respuesta de SUNAT
         setState(() {
           _razonSocialController.text = data['business_name'] ?? '';
           _direccionController.text = data['tax_address'] ?? '';
@@ -111,15 +107,12 @@ class _FacturaScreenState extends State<FacturaScreen> {
     }
   }
 
-  // --- LOGICA IMAGEN QR ---
   Future<void> _cargarImagenQr(String wallet) async {
     setState(() {
       _isLoadingQr = true;
       _qrImageUrl = null;
     });
-
     final url = await _paymentService.obtenerInfoBilletera(wallet);
-
     if (mounted) {
       setState(() {
         _qrImageUrl = url;
@@ -135,7 +128,92 @@ class _FacturaScreenState extends State<FacturaScreen> {
     }
   }
 
-  // --- LOGICA GENERAL UI ---
+  // --- VALIDACION ---
+  void _validarYFinalizar(double total, CartProvider cart) async {
+    if (_rucController.text.length != 11) {
+      _showCustomNotice(
+          message: "El RUC debe tener 11 dígitos",
+          icon: Symbols.info,
+          color: Colors.orange[800]!);
+      return;
+    }
+    if (_razonSocialController.text.isEmpty ||
+        _direccionController.text.isEmpty) {
+      _showCustomNotice(
+          message: "Complete los datos de la empresa",
+          icon: Symbols.domain,
+          color: Colors.orange[800]!);
+      return;
+    }
+
+    // 1. Efectivo
+    if (_selectedPayment == 'efectivo') {
+      double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
+      if (recibido < total) {
+        _showCustomNotice(
+            message: "Efectivo insuficiente",
+            icon: Symbols.payments,
+            color: Colors.redAccent);
+        return;
+      }
+      _showSuccessDialog(total, cart);
+    }
+    // 2. Yape/Plin
+    else if (_selectedPayment == 'yape') {
+      if (_opController.text.isEmpty) {
+        _showCustomNotice(
+            message: "Ingresa el Nro. de Operación",
+            icon: Symbols.qr_code_2,
+            color: Colors.blueAccent);
+        return;
+      }
+      await _procesarPagoApi(total, cart, _razonSocialController.text,
+          _digitalWallet, _opController.text);
+    }
+    // 3. Otros
+    else if (_selectedPayment == 'otros') {
+      if (_referenceController.text.isEmpty) {
+        _showCustomNotice(
+            message: "Ingrese Código/Ref.",
+            icon: Symbols.receipt_long,
+            color: Colors.blueAccent);
+        return;
+      }
+      await _procesarPagoApi(total, cart, _razonSocialController.text,
+          _selectedOtherType, _referenceController.text);
+    }
+  }
+
+  Future<void> _procesarPagoApi(double total, CartProvider cart, String cliente,
+      String metodo, String ref) async {
+    setState(() => _isProcessing = true);
+    try {
+      await _paymentService.procesarPagoDigital(
+        wallet: metodo,
+        numeroOperacion: ref,
+        monto: total,
+        nombreCliente: cliente,
+        documento: _rucController.text,
+      );
+
+      if (!mounted) return;
+      _showSuccessDialog(total, cart);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final message = e.error.toString();
+      _showCustomNotice(
+          message: message, icon: Symbols.error, color: Colors.red);
+    } catch (e) {
+      if (!mounted) return;
+      _showCustomNotice(
+          message: "Error: $e", icon: Symbols.error, color: Colors.red);
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  // --- UI HELPERS ---
+
   void _showCustomNotice(
       {required String message, required IconData icon, required Color color}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -166,79 +244,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
   void _calculateChange(double total) {
     double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
     setState(() => _vuelto = recibido > total ? recibido - total : 0.0);
-  }
-
-  void _validarYFinalizar(double total, CartProvider cart) async {
-    // Validaciones
-    if (_rucController.text.length != 11) {
-      _showCustomNotice(
-          message: "El RUC debe tener 11 dígitos",
-          icon: Symbols.info,
-          color: Colors.orange[800]!);
-      return;
-    }
-    if (_razonSocialController.text.isEmpty ||
-        _direccionController.text.isEmpty) {
-      _showCustomNotice(
-          message: "Complete los datos de la empresa",
-          icon: Symbols.domain,
-          color: Colors.orange[800]!);
-      return;
-    }
-
-    if (_selectedPayment == 'efectivo') {
-      double recibido = double.tryParse(_recibidoController.text) ?? 0.0;
-      if (recibido < total) {
-        _showCustomNotice(
-            message: "Efectivo insuficiente",
-            icon: Symbols.payments,
-            color: Colors.redAccent);
-        return;
-      }
-      _showSuccessDialog(total, cart);
-    } else if (_selectedPayment == 'yape') {
-      if (_opController.text.isEmpty) {
-        _showCustomNotice(
-            message: "Ingresa el Nro. de Operación",
-            icon: Symbols.qr_code_2,
-            color: Colors.blueAccent);
-        return;
-      }
-
-      setState(() => _isProcessing = true);
-
-      try {
-        await _paymentService.procesarPagoDigital(
-          wallet: _digitalWallet,
-          numeroOperacion: _opController.text,
-          monto: total,
-          // Mapeamos los campos correctos para factura
-          nombreCliente: _razonSocialController.text,
-          documento: _rucController.text,
-        );
-
-        if (!mounted) return;
-
-        _showSuccessDialog(total, cart);
-      } on DioException catch (e) {
-        if (!mounted) return;
-        final message = e.error.toString();
-        _showCustomNotice(
-          message: message,
-          icon: Symbols.error,
-          color: Colors.red,
-        );
-      } catch (e) {
-        if (!mounted) return;
-        _showCustomNotice(
-          message: "Error desconocido: $e",
-          icon: Symbols.error,
-          color: Colors.red,
-        );
-      } finally {
-        if (mounted) setState(() => _isProcessing = false);
-      }
-    }
   }
 
   void _showSuccessDialog(double total, CartProvider cart) {
@@ -399,8 +404,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     fontWeight: FontWeight.w900,
                     color: AppColors.extradarkT)),
             const SizedBox(height: 15),
-
-            // --- CAMPO RUC CON BOTON DE BUSQUEDA ---
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -417,7 +420,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                 _buildSearchButton(),
               ],
             ),
-
             const SizedBox(height: 15),
             _buildInputField(
                 label: "Razón Social",
@@ -441,16 +443,21 @@ class _FacturaScreenState extends State<FacturaScreen> {
               Expanded(
                   child: _buildPaymentMiniCard(
                       "Efectivo", Symbols.payments, 'efectivo')),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                   child: _buildPaymentMiniCard(
-                      "Yape / Plin", Symbols.qr_code_scanner, 'yape')),
+                      "Yape/Plin", Symbols.qr_code_scanner, 'yape')),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: _buildPaymentMiniCard(
+                      "Otros", Symbols.more_horiz, 'otros')),
             ]),
             const SizedBox(height: 25),
             if (_selectedPayment == 'efectivo')
               _buildCashCalculator(totalPagar),
             if (_selectedPayment == 'yape')
               _buildDigitalWalletSelector(totalPagar),
+            if (_selectedPayment == 'otros') _buildOtherPaymentSelector(),
             const SizedBox(height: 30),
             _buildSummaryBox(totalPagar),
             const SizedBox(height: 30),
@@ -462,7 +469,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
     );
   }
 
-  // --- WIDGET BOTON BUSQUEDA ---
+  // --- WIDGETS AUXILIARES ---
+
   Widget _buildSearchButton() {
     return GestureDetector(
       onTap: _isSearchingRuc ? null : _buscarRuc,
@@ -568,11 +576,15 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   color:
                       isSelected ? AppColors.primaryP : AppColors.tertiaryS)),
           child: Column(children: [
-            Icon(icon, color: isSelected ? Colors.white : AppColors.primaryP),
+            Icon(icon,
+                color: isSelected ? Colors.white : AppColors.primaryP,
+                size: 28),
             const SizedBox(height: 5),
             Text(title,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                     color: isSelected ? Colors.white : AppColors.extradarkT,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold))
           ])),
     );
@@ -647,6 +659,97 @@ class _FacturaScreenState extends State<FacturaScreen> {
                 style: TextStyle(
                     color: isSelected ? Colors.white : AppColors.semidarkT,
                     fontWeight: FontWeight.bold))),
+      ),
+    );
+  }
+
+  // --- WIDGET ACTUALIZADO: Selector de "OTROS" en cuadrícula 2x2 ---
+  Widget _buildOtherPaymentSelector() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: AppColors.primaryS,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.tertiaryS)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Tipo de Transacción",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.semidarkT)),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              Expanded(
+                  child:
+                      _buildOtherTypeChip("Card", Symbols.credit_card, "card")),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _buildOtherTypeChip(
+                      "Transfer", Symbols.account_balance, "transfers")),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                  child: _buildOtherTypeChip(
+                      "Deposit", Symbols.savings, "deposits")),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _buildOtherTypeChip(
+                      "Others", Symbols.confirmation_number, "others")),
+            ],
+          ),
+          const SizedBox(height: 25),
+          _buildInputField(
+            label: "Referencia / Código",
+            hint: "Nro. transacción o nota",
+            icon: Symbols.receipt_long,
+            controller: _referenceController,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET ACTUALIZADO: Chip más grande ---
+  Widget _buildOtherTypeChip(String label, IconData icon, String value) {
+    bool isSelected = _selectedOtherType == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedOtherType = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+            color: isSelected ? AppColors.primaryP : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: isSelected ? AppColors.primaryP : Colors.grey.shade300,
+                width: isSelected ? 2 : 1),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                        color: AppColors.primaryP.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4))
+                  ]
+                : null),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 32,
+                color: isSelected ? Colors.white : AppColors.semidarkT),
+            const SizedBox(height: 8),
+            Text(label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? Colors.white : AppColors.semidarkT)),
+          ],
+        ),
       ),
     );
   }
