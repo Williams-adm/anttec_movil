@@ -25,8 +25,8 @@ class FacturaScreen extends StatefulWidget {
 
 class _FacturaScreenState extends State<FacturaScreen> {
   String _selectedPayment = 'efectivo';
-  String _digitalWallet = 'yape';
-  final String _selectedOtherType = 'card';
+  String _digitalWallet = 'yape'; // ✅ Valores posibles: 'yape' o 'plin'
+  String _selectedOtherType = 'card'; // ✅ card, transfers, depositis, others
   final String _tipoDocumento = 'RUC';
 
   final _rucController = TextEditingController();
@@ -113,7 +113,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
   }
 
   Future<void> _validarYFinalizar(double total, CartProvider cart) async {
-    // 1. VALIDACIÓN: Datos fiscales
     if (_razonSocialController.text.trim().isEmpty ||
         _direccionController.text.trim().isEmpty) {
       _showNotice(
@@ -121,7 +120,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
       return;
     }
 
-    // 2. VALIDACIÓN: Pago
     if (_selectedPayment == 'efectivo') {
       double recibido =
           double.tryParse(_recibidoController.text.replaceAll(',', '.')) ?? 0.0;
@@ -133,6 +131,21 @@ class _FacturaScreenState extends State<FacturaScreen> {
 
     setState(() => _isProcessing = true);
 
+    // ✅ LÓGICA DE MAPEADO DINÁMICO DE PAGO
+    String finalPaymentMethod = "";
+    String? finalCode;
+
+    if (_selectedPayment == 'efectivo') {
+      finalPaymentMethod = "cash";
+    } else if (_selectedPayment == 'yape') {
+      finalPaymentMethod = _digitalWallet; // Enviará "yape" o "plin"
+      finalCode = _opController.text;
+    } else {
+      finalPaymentMethod =
+          _selectedOtherType; // card, transfers, depositis, others
+      finalCode = _referenceController.text;
+    }
+
     final orderData = {
       "type_voucher": "factura",
       "document_type": _tipoDocumento,
@@ -141,9 +154,9 @@ class _FacturaScreenState extends State<FacturaScreen> {
         "business_name": _razonSocialController.text.trim(),
         "tax_address": _direccionController.text.trim()
       },
-      "payment_method": _selectedPayment == 'efectivo'
-          ? 'cash'
-          : (_selectedPayment == 'yape' ? _digitalWallet : _selectedOtherType),
+      "payment_method": finalPaymentMethod,
+      if (finalCode != null && finalCode.isNotEmpty)
+        "payment_method_code": finalCode,
       "items": cart.items
           .map((i) => {
                 "product_id": i.id,
@@ -228,18 +241,45 @@ class _FacturaScreenState extends State<FacturaScreen> {
                 DigitalWalletPanel(
                     selectedWallet: _digitalWallet,
                     onWalletChanged: (v) {
-                      setState(() => _digitalWallet = v);
+                      setState(() =>
+                          _digitalWallet = v); // ✅ Actualiza a "yape" o "plin"
                       _cargarImagenQr(v);
                     },
                     isLoadingQr: _isLoadingQr,
                     qrImageUrl: _qrImageUrl,
                     opController: _opController),
               if (_selectedPayment == 'otros')
-                OtherPaymentPanel(
-                    selectedType: _selectedOtherType,
-                    onTypeChanged: (v) =>
-                        setState(() => _selectedPayment = 'otros'),
-                    refController: _referenceController),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Tipo de Transacción",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 15),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 2.2,
+                      children: [
+                        _buildSubtypeButton(
+                            "Tarjeta", Symbols.credit_card, 'card'),
+                        _buildSubtypeButton(
+                            "Transf.", Symbols.account_balance, 'transfers'),
+                        _buildSubtypeButton(
+                            "Depósito", Symbols.savings, 'depositis'),
+                        _buildSubtypeButton(
+                            "Otros", Symbols.more_horiz, 'others'),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    BoletaInputField(
+                        label: "Referencia",
+                        icon: Symbols.receipt_long,
+                        controller: _referenceController),
+                  ],
+                ),
               const SizedBox(height: 30),
               AmountSummary(total: total),
               const SizedBox(height: 30),
@@ -249,6 +289,32 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   onProcess: () => _validarYFinalizar(total, cart)),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubtypeButton(String label, IconData icon, String value) {
+    bool isSelected = _selectedOtherType == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedOtherType = value),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryP : Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+              color: isSelected ? AppColors.primaryP : Colors.grey.shade300),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : Colors.grey),
+            Text(label,
+                style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.grey,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold)),
+          ],
         ),
       ),
     );
@@ -276,17 +342,12 @@ class _FacturaScreenState extends State<FacturaScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 10),
             const Icon(Symbols.check_circle,
                 color: Colors.green, size: 80, fill: 1),
             const SizedBox(height: 20),
             const Text("¡Factura Emitida!",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 10),
-            const Text("La factura ha sido procesada con éxito.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54, fontSize: 14)),
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {

@@ -24,8 +24,8 @@ class BoletaScreen extends StatefulWidget {
 
 class _BoletaScreenState extends State<BoletaScreen> {
   String _selectedPayment = 'efectivo';
-  static const String _digitalWallet = 'yape';
-  static const String _selectedOtherType = 'card';
+  String _digitalWallet = 'yape'; // ✅ Valores posibles: 'yape' o 'plin'
+  String _selectedOtherType = 'card'; // ✅ card, transfers, depositis, others
   String _tipoDocumento = 'DNI';
 
   final _docNumberController = TextEditingController();
@@ -104,7 +104,6 @@ class _BoletaScreenState extends State<BoletaScreen> {
   }
 
   Future<void> _validarYFinalizar(double total, CartProvider cart) async {
-    // 1. VALIDACIÓN: Campos vacíos
     if (_nombreController.text.trim().isEmpty ||
         _apellidoController.text.trim().isEmpty) {
       _showNotice(
@@ -112,7 +111,6 @@ class _BoletaScreenState extends State<BoletaScreen> {
       return;
     }
 
-    // 2. VALIDACIÓN: Pago insuficiente
     if (_selectedPayment == 'efectivo') {
       double recibido =
           double.tryParse(_recibidoController.text.replaceAll(',', '.')) ?? 0.0;
@@ -124,6 +122,21 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
     setState(() => _isProcessing = true);
 
+    // ✅ LÓGICA DE MAPEADO DINÁMICO DE PAGO
+    String finalPaymentMethod = "";
+    String? finalCode;
+
+    if (_selectedPayment == 'efectivo') {
+      finalPaymentMethod = "cash";
+    } else if (_selectedPayment == 'yape') {
+      finalPaymentMethod = _digitalWallet; // Enviará "yape" o "plin"
+      finalCode = _opController.text;
+    } else {
+      finalPaymentMethod =
+          _selectedOtherType; // card, transfers, depositis, others
+      finalCode = _referenceController.text;
+    }
+
     final orderData = {
       "type_voucher": "boleta",
       "document_type": _tipoDocumento,
@@ -132,9 +145,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
         "name": _nombreController.text.trim(),
         "last_name": _apellidoController.text.trim()
       },
-      "payment_method": _selectedPayment == 'efectivo'
-          ? 'cash'
-          : (_selectedPayment == 'yape' ? _digitalWallet : _selectedOtherType),
+      "payment_method": finalPaymentMethod,
+      if (finalCode != null && finalCode.isNotEmpty)
+        "payment_method_code": finalCode,
       "items": cart.items
           .map((i) => {
                 "product_id": i.id,
@@ -220,10 +233,46 @@ class _BoletaScreenState extends State<BoletaScreen> {
               if (_selectedPayment == 'yape')
                 DigitalWalletPanel(
                     selectedWallet: _digitalWallet,
-                    onWalletChanged: (v) => _cargarImagenQr(v),
+                    onWalletChanged: (v) {
+                      setState(() =>
+                          _digitalWallet = v); // ✅ Actualiza a "yape" o "plin"
+                      _cargarImagenQr(v);
+                    },
                     isLoadingQr: _isLoadingQr,
                     qrImageUrl: _qrImageUrl,
                     opController: _opController),
+              if (_selectedPayment == 'otros')
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Tipo de Transacción",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 15),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 2.2,
+                      children: [
+                        _buildSubtypeButton(
+                            "Tarjeta", Symbols.credit_card, 'card'),
+                        _buildSubtypeButton(
+                            "Transf.", Symbols.account_balance, 'transfers'),
+                        _buildSubtypeButton(
+                            "Depósito", Symbols.savings, 'depositis'),
+                        _buildSubtypeButton(
+                            "Otros", Symbols.more_horiz, 'others'),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    BoletaInputField(
+                        label: "Referencia",
+                        icon: Symbols.receipt_long,
+                        controller: _referenceController),
+                  ],
+                ),
               const SizedBox(height: 20),
               AmountSummary(total: total),
               const SizedBox(height: 30),
@@ -233,6 +282,32 @@ class _BoletaScreenState extends State<BoletaScreen> {
                   onProcess: () => _validarYFinalizar(total, cart)),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubtypeButton(String label, IconData icon, String value) {
+    bool isSelected = _selectedOtherType == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedOtherType = value),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryP : Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+              color: isSelected ? AppColors.primaryP : Colors.grey.shade300),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : Colors.grey),
+            Text(label,
+                style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.grey,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold)),
+          ],
         ),
       ),
     );
@@ -258,17 +333,12 @@ class _BoletaScreenState extends State<BoletaScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 10),
             const Icon(Symbols.check_circle,
                 color: Colors.green, size: 80, fill: 1),
             const SizedBox(height: 20),
             const Text("¡Venta Exitosa!",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 10),
-            const Text("El comprobante se ha generado correctamente.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54, fontSize: 14)),
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
