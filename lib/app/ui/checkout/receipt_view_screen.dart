@@ -36,24 +36,21 @@ class ReceiptViewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // PopScope bloquea el botón físico "atrás" para que no vuelvan al formulario
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        // Al intentar dar atrás, limpiamos carrito y vamos a Home
         context.read<CartProvider>().clearCart();
         context.go('/home');
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF0F2F5),
+        backgroundColor:
+            const Color(0xFFF4F7FA), // Fondo un poco más azulado y limpio
         appBar: AppBar(
-          title: const Text(
-            "Comprobante Digital",
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-          ),
+          title: const Text("Comprobante Digital",
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
           centerTitle: true,
-          automaticallyImplyLeading: false, // Quitamos flecha de atrás
+          automaticallyImplyLeading: false,
           backgroundColor: Colors.white,
           elevation: 0,
         ),
@@ -61,14 +58,15 @@ class ReceiptViewScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
           child: Column(
             children: [
-              // --- TICKET VISUAL ---
+              // --- CARD DE TICKET ---
               Container(
+                width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(30), // Bordes más suaves
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -76,60 +74,100 @@ class ReceiptViewScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    const SizedBox(height: 30),
-                    const CircleAvatar(
-                      radius: 35,
-                      backgroundColor: Color(0xFFE8F5E9),
-                      child: Icon(
+                    const SizedBox(height: 35),
+
+                    // Icono de éxito animado visualmente
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE8F5E9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
                         Symbols.check_circle,
                         color: Colors.green,
-                        size: 45,
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    const Text(
-                      "¡Venta Exitosa!",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 20,
+                        size: 50,
+                        fill: 1,
                       ),
                     ),
 
                     const SizedBox(height: 20),
 
-                    // --- FILAS DE INFORMACIÓN (CON FIX DE OVERFLOW) ---
-                    _buildInfoRow("Nro. Documento", saleData['id'] ?? '---'),
-                    _buildInfoRow("Tipo", saleData['type'] ?? 'Comprobante'),
-                    _buildInfoRow(
-                      "Cliente",
-                      saleData['customer_name'] ?? 'Público General',
+                    const Text(
+                      "¡Venta Exitosa!",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black87,
+                      ),
                     ),
 
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 8),
+
                     const Text(
-                      "TOTAL PAGADO",
-                      style: TextStyle(
-                        color: Colors.black45,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
+                      "El comprobante ha sido generado",
+                      style: TextStyle(color: Colors.black45, fontSize: 14),
+                    ),
+
+                    const Padding(
+                      padding:
+                          EdgeInsets.symmetric(vertical: 25, horizontal: 40),
+                      child: Divider(color: Color(0xFFF0F0F0), thickness: 1.5),
+                    ),
+
+                    // --- DETALLES CENTRADOS ---
+                    _buildCenteredInfo(
+                        "NRO. DOCUMENTO", saleData['id'] ?? '---'),
+                    const SizedBox(height: 20),
+                    _buildCenteredInfo("CLIENTE",
+                        saleData['customer_name'] ?? 'Público General'),
+
+                    const SizedBox(height: 30),
+
+                    // --- SECCIÓN TOTAL ---
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 30),
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            "TOTAL PAGADO",
+                            style: TextStyle(
+                              color: Colors.black38,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "S/. ${(saleData['amount'] as double).toStringAsFixed(2)}",
+                            style: const TextStyle(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primaryP,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      "S/. ${(saleData['amount'] as double).toStringAsFixed(2)}",
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.primaryP,
-                      ),
-                    ),
+
                     const SizedBox(height: 40),
+
+                    // Decoración de borde dentado (opcional)
+                    _buildTicketCutter(),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
 
-              // Botón principal
+              // --- BOTONES ---
               ElevatedButton.icon(
                 onPressed: () => _openPdfDetail(context),
                 icon: const Icon(Symbols.picture_as_pdf, color: Colors.white),
@@ -137,16 +175,15 @@ class ReceiptViewScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black87,
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 55),
+                  minimumSize: const Size(double.infinity, 58),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                      borderRadius: BorderRadius.circular(18)),
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 15),
 
-              // Botón salir
               TextButton(
                 onPressed: () {
                   context.read<CartProvider>().clearCart();
@@ -155,8 +192,9 @@ class ReceiptViewScreen extends StatelessWidget {
                 child: const Text(
                   "REGRESAR AL INICIO",
                   style: TextStyle(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.black45,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -167,32 +205,52 @@ class ReceiptViewScreen extends StatelessWidget {
     );
   }
 
-  // ✅ MÉTODO BLINDADO CONTRA TEXTOS LARGOS
-  Widget _buildInfoRow(String label, String value) {
+  // Widget para crear información centrada y limpia
+  Widget _buildCenteredInfo(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Column(
         children: [
           Text(
             label,
-            style: const TextStyle(color: Colors.black54, fontSize: 13),
+            style: const TextStyle(
+              color: Colors.black38,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            ),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            // <--- Esto hace que el texto use el espacio sobrante y salte de línea
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: Colors.black87,
-              ),
-              softWrap: true,
+          const SizedBox(height: 4),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Pequeño adorno visual para el final del ticket
+  Widget _buildTicketCutter() {
+    return Row(
+      children: List.generate(
+        15,
+        (index) => Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            height: 12,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F7FA), // Mismo color que el fondo
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(10)),
+            ),
+          ),
+        ),
       ),
     );
   }
