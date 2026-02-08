@@ -65,19 +65,20 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   // --- NUEVA LÓGICA: NAVEGAR AL VISOR INTERNO ---
   void _handleViewPdf(String? url, String orderNumber) {
     if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
           content: Text("No hay PDF disponible"),
-          backgroundColor: Colors.orange));
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PdfViewerScreen(
-          path: url,
-          title: "Comprobante $orderNumber",
-        ),
+        builder: (context) =>
+            PdfViewerScreen(path: url, title: "Comprobante $orderNumber"),
       ),
     );
   }
@@ -105,8 +106,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("Error al obtener datos de impresión"),
-            backgroundColor: Colors.red),
+          content: Text("Error al obtener datos de impresión"),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -124,11 +126,16 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   }
 
   void _executePrint(
-      String type, String address, Map<String, dynamic> sale) async {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text("Imprimiendo ${sale['order_number']}..."),
-      backgroundColor: Colors.black87,
-    ));
+    String type,
+    String address,
+    Map<String, dynamic> sale,
+  ) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Imprimiendo ${sale['order_number']}..."),
+        backgroundColor: Colors.black87,
+      ),
+    );
     try {
       if (type == 'NET') {
         await _printerService.printNetwork(address, 9100, sale);
@@ -188,11 +195,14 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: const Text("Historial de Ventas",
-            style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-                fontSize: 20)),
+        title: const Text(
+          "Historial de Ventas",
+          style: TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
           IconButton(
@@ -219,7 +229,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                   child: Text(
                     "Filtro: ${DateFormat('dd/MM/yyyy').format(vm.selectedDate!)}",
                     style: TextStyle(
-                        color: _purpleColor, fontWeight: FontWeight.bold),
+                      color: _purpleColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -237,10 +249,11 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         itemBuilder: (context, index) {
                           if (index == vm.sales.length) {
                             return const Center(
-                                child: Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: CircularProgressIndicator(),
-                            ));
+                              child: Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
                           }
                           return _buildSaleCard(vm.sales[index], index);
                         },
@@ -262,9 +275,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: _purpleColor.withValues(alpha: 0.1),
-              blurRadius: 15,
-              offset: const Offset(0, 5)),
+            color: _purpleColor.withValues(alpha: 0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Row(
@@ -273,17 +287,23 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Total Recaudado",
-                  style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500)),
+              Text(
+                "Total Recaudado",
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               const SizedBox(height: 5),
-              Text("S/. ${total.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                      color: Colors.black87,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800)),
+              Text(
+                "S/. ${total.toStringAsFixed(2)}",
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ],
           ),
           Container(
@@ -294,16 +314,21 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
             ),
             child: Column(
               children: [
-                Text("$count",
-                    style: TextStyle(
-                        color: _purpleColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20)),
-                Text("Ventas",
-                    style: TextStyle(color: _purpleColor, fontSize: 10)),
+                Text(
+                  "$count",
+                  style: TextStyle(
+                    color: _purpleColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+                Text(
+                  "Ventas",
+                  style: TextStyle(color: _purpleColor, fontSize: 10),
+                ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
@@ -324,9 +349,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Padding(
@@ -350,29 +376,36 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                          isFactura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA",
-                          style: TextStyle(
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12)),
+                        isFactura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(sale['order_number'] ?? '---',
-                          style: const TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16)),
+                      Text(
+                        sale['order_number'] ?? '---',
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(sale['time'] ?? '',
-                        style:
-                            TextStyle(color: Colors.grey[500], fontSize: 12)),
-                    Text(sale['date'] ?? '',
-                        style:
-                            TextStyle(color: Colors.grey[500], fontSize: 10)),
+                    Text(
+                      sale['time'] ?? '',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
+                    Text(
+                      sale['date'] ?? '',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 10),
+                    ),
                   ],
                 ),
               ],
@@ -385,39 +418,53 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(_getPaymentIcon(paymentMethod),
-                        size: 18, color: Colors.grey[600]),
+                    Icon(
+                      _getPaymentIcon(paymentMethod),
+                      size: 18,
+                      color: Colors.grey[600],
+                    ),
                     const SizedBox(width: 8),
-                    Text(paymentMethod.toUpperCase(),
-                        style: TextStyle(
-                            color: Colors.grey[700],
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      paymentMethod.toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _paidColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text("EXITOSO",
-                      style: TextStyle(
-                          color: _paidColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold)),
+                  child: Text(
+                    "EXITOSO",
+                    style: TextStyle(
+                      color: _paidColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 5),
             Align(
               alignment: Alignment.centerRight,
-              child: Text("S/. ${amount.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20)),
+              child: Text(
+                "S/. ${amount.toStringAsFixed(2)}",
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -433,7 +480,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                       foregroundColor: Colors.black87,
                       side: BorderSide(color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     icon: const Icon(Symbols.visibility, size: 18),
@@ -449,7 +497,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                       backgroundColor: themeColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
                     ),
@@ -472,8 +521,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
         children: [
           Icon(Symbols.receipt_long, size: 60, color: Colors.grey[300]),
           const SizedBox(height: 10),
-          Text("No hay ventas registradas",
-              style: TextStyle(color: Colors.grey[500])),
+          Text(
+            "No hay ventas registradas",
+            style: TextStyle(color: Colors.grey[500]),
+          ),
         ],
       ),
     );

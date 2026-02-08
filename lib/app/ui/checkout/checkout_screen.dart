@@ -33,8 +33,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: CircleAvatar(
             backgroundColor: AppColors.primaryS,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new,
-                  color: AppColors.extradarkT, size: 18),
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: AppColors.extradarkT,
+                size: 18,
+              ),
               onPressed: () => context.pop(),
             ),
           ),
@@ -59,10 +62,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 12),
               const Text(
                 "Selecciona una opción para continuar con el registro de tu venta.",
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.semidarkT,
-                ),
+                style: TextStyle(fontSize: 15, color: AppColors.semidarkT),
               ),
               const SizedBox(height: 40),
 
@@ -124,7 +124,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   : Colors.black.withValues(alpha: 0.03),
               blurRadius: 20,
               offset: const Offset(0, 10),
-            )
+            ),
           ],
         ),
         child: Row(
@@ -203,7 +203,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     color: AppColors.primaryP.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -223,8 +223,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             foregroundColor: Colors.white,
             disabledBackgroundColor: AppColors.secondaryS,
             padding: const EdgeInsets.symmetric(vertical: 20),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             elevation: 0,
           ),
           child: const Row(

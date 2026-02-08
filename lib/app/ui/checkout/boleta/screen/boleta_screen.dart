@@ -1,21 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
-// --- RUTAS DE WIDGETS ---
-import 'package:anttec_movil/app/ui/checkout/boleta/widgets/boleta_widgets.dart'; // Trae AmountSummary y BoletaFooter
+import 'package:anttec_movil/app/ui/checkout/boleta/widgets/boleta_widgets.dart';
 import 'package:anttec_movil/app/ui/checkout/receipt_view_screen.dart';
-
-// --- SERVICIOS ---
 import 'package:anttec_movil/data/services/api/v1/sales_service.dart';
 import 'package:anttec_movil/data/services/api/v1/customer_service.dart';
 import 'package:anttec_movil/data/services/api/v1/payment_service.dart';
 
-// --- FLUTTER ---
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import 'package:anttec_movil/app/core/styles/colors.dart';
 import 'package:anttec_movil/app/ui/cart/controllers/cart_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -27,13 +22,11 @@ class BoletaScreen extends StatefulWidget {
 }
 
 class _BoletaScreenState extends State<BoletaScreen> {
-  // --- ESTADO ---
   String _selectedPayment = 'efectivo';
-  String _digitalWallet = 'yape';
-  String _selectedOtherType = 'card';
+  static const String _digitalWallet = 'yape';
+  static const String _selectedOtherType = 'card';
   String _tipoDocumento = 'DNI';
 
-  // --- CONTROLADORES ---
   final _docNumberController = TextEditingController();
   final _nombreController = TextEditingController();
   final _apellidoController = TextEditingController();
@@ -41,18 +34,17 @@ class _BoletaScreenState extends State<BoletaScreen> {
   final _opController = TextEditingController();
   final _referenceController = TextEditingController();
 
-  // --- SERVICIOS ---
   final _salesService = SalesService();
   final _customerService = CustomerService();
   final _paymentService = PaymentService();
 
-  // --- VARIABLES LÓGICAS ---
   double _vuelto = 0.0;
   bool _isProcessing = false;
   bool _isSearchingDni = false;
   String? _qrImageUrl;
   bool _isLoadingQr = false;
   String? _pdfPath;
+  Uint8List? _pdfBytes;
 
   @override
   void initState() {
@@ -71,14 +63,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
     super.dispose();
   }
 
-  // --- LÓGICA DE NEGOCIO ---
-
   Future<void> _buscarDni() async {
     final dni = _docNumberController.text.trim();
-    if (dni.length != 8) {
-      _showNotice("DNI debe tener 8 dígitos", Symbols.warning, Colors.orange);
-      return;
-    }
+    if (dni.length != 8) return;
     setState(() => _isSearchingDni = true);
     try {
       final data = await _customerService.consultarDni(dni);
@@ -116,206 +103,147 @@ class _BoletaScreenState extends State<BoletaScreen> {
   }
 
   Future<void> _validarYFinalizar(double total, CartProvider cart) async {
-    // 1. Validaciones
-    final docLen = _docNumberController.text.length;
-    if (_tipoDocumento == 'DNI' && docLen != 8) {
-      _showNotice("DNI incorrecto", Symbols.error, Colors.red);
-      return;
-    }
-    if (_tipoDocumento == 'CE' && (docLen < 8 || docLen > 12)) {
-      _showNotice("CE inválido", Symbols.error, Colors.red);
-      return;
-    }
-    if (_nombreController.text.isEmpty || _apellidoController.text.isEmpty) {
+    if (_nombreController.text.isEmpty) {
       _showNotice("Complete datos del cliente", Symbols.person, Colors.orange);
       return;
     }
 
-    // 2. Preparar Pago
-    String paymentMethod = '';
-    String? paymentCode;
-    double? cashAmount;
-
-    if (_selectedPayment == 'efectivo') {
-      double recibido =
-          double.tryParse(_recibidoController.text.replaceAll(',', '.')) ?? 0.0;
-      if (recibido < total) {
-        _showNotice("Pago insuficiente", Symbols.money_off, Colors.red);
-        return;
-      }
-      paymentMethod = 'cash';
-      cashAmount = recibido;
-    } else if (_selectedPayment == 'yape') {
-      if (_opController.text.isEmpty) {
-        _showNotice("Falta Nro Operación", Symbols.qr_code, Colors.orange);
-        return;
-      }
-      paymentMethod = _digitalWallet;
-      paymentCode = _opController.text;
-    } else {
-      paymentMethod = _selectedOtherType;
-      paymentCode = _referenceController.text;
-    }
-
     setState(() => _isProcessing = true);
 
-    // 3. Crear Objeto
     final orderData = {
       "type_voucher": "boleta",
       "document_type": _tipoDocumento,
       "document_number": int.tryParse(_docNumberController.text) ?? 0,
       "customer": {
         "name": _nombreController.text,
-        "last_name": _apellidoController.text
+        "last_name": _apellidoController.text,
       },
-      "payment_method": paymentMethod,
-      if (paymentCode != null) "payment_method_code": paymentCode,
-      if (cashAmount != null) "cash": cashAmount,
+      "payment_method": _selectedPayment == 'efectivo'
+          ? 'cash'
+          : (_selectedPayment == 'yape' ? _digitalWallet : _selectedOtherType),
       "items": cart.items
-          .map((i) => {
-                "product_id": i.id,
-                "quantity": i.quantity,
-                "price": i.price,
-                "name": i.name
-              })
+          .map(
+            (i) => {
+              "product_id": i.id,
+              "quantity": i.quantity,
+              "price": i.price,
+              "name": i.name,
+            },
+          )
           .toList(),
-      "total": total
+      "total": total,
     };
 
-    // 4. Enviar
     try {
       final res = await _salesService.createOrder(orderData);
-
-      if (!mounted) return;
-
       if (res.data['voucher'] != null) {
-        final bytes = base64Decode(res.data['voucher']['content']);
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/${res.data['voucher']['filename']}');
-        await file.writeAsBytes(bytes);
+        String rawBase64 = res.data['voucher']['content'].toString().replaceAll(
+          RegExp(r'\s+'),
+          '',
+        );
+        final bytes = base64Decode(rawBase64);
+        _pdfBytes = bytes;
+
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File(
+          '${dir.path}/bol_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        );
+        await file.writeAsBytes(bytes, flush: true);
         setState(() => _pdfPath = file.path);
       }
       _showSuccessDialog(total, cart);
     } catch (e) {
-      _showNotice("Error al procesar venta", Symbols.wifi_off, Colors.red);
+      _showNotice("Error al procesar venta", Symbols.error, Colors.red);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  // --- VISTA PRINCIPAL ---
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final total = cart.totalAmount;
 
-    return Scaffold(
-      appBar: AppBar(
-          title: const Text("Finalizar Boleta",
-              style: TextStyle(fontWeight: FontWeight.w900))),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. CLIENTE
-            const Text("Datos del Cliente",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.extradarkT)),
-            const SizedBox(height: 15),
-
-            ClientHeaderSection(
-              tipoDocumento: _tipoDocumento,
-              onTypeChanged: (val) {
-                setState(() => _tipoDocumento = val);
-                _docNumberController.clear();
-              },
-              docController: _docNumberController,
-              isSearching: _isSearchingDni,
-              onSearch: _buscarDni,
-            ),
-
-            BoletaInputField(
+    return PopScope(
+      canPop:
+          !_isProcessing, // Bloquea el botón atrás si está procesando la venta
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            "Finalizar Boleta",
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            children: [
+              ClientHeaderSection(
+                tipoDocumento: _tipoDocumento,
+                onTypeChanged: (v) => setState(() => _tipoDocumento = v),
+                docController: _docNumberController,
+                isSearching: _isSearchingDni,
+                onSearch: _buscarDni,
+              ),
+              BoletaInputField(
                 label: "Nombres",
                 icon: Symbols.person,
-                controller: _nombreController),
-            BoletaInputField(
+                controller: _nombreController,
+              ),
+              BoletaInputField(
                 label: "Apellidos",
                 icon: Symbols.person_add,
-                controller: _apellidoController),
-
-            const SizedBox(height: 35),
-
-            // 2. PAGOS
-            const Text("Método de Pago",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.extradarkT)),
-            const SizedBox(height: 15),
-
-            PaymentMethodsSelector(
+                controller: _apellidoController,
+              ),
+              const SizedBox(height: 25),
+              PaymentMethodsSelector(
                 selectedPayment: _selectedPayment,
-                onPaymentChanged: (v) => setState(() => _selectedPayment = v)),
-
-            const SizedBox(height: 25),
-
-            if (_selectedPayment == 'efectivo')
-              CashPaymentPanel(
+                onPaymentChanged: (v) => setState(() => _selectedPayment = v),
+              ),
+              const SizedBox(height: 20),
+              if (_selectedPayment == 'efectivo')
+                CashPaymentPanel(
                   controller: _recibidoController,
                   total: total,
                   vuelto: _vuelto,
-                  onChanged: (_) => _calculateChange(total)),
-
-            if (_selectedPayment == 'yape')
-              DigitalWalletPanel(
+                  onChanged: (_) => _calculateChange(total),
+                ),
+              if (_selectedPayment == 'yape')
+                DigitalWalletPanel(
                   selectedWallet: _digitalWallet,
-                  onWalletChanged: (v) {
-                    setState(() => _digitalWallet = v);
-                    _cargarImagenQr(v);
-                  },
+                  onWalletChanged: (v) => _cargarImagenQr(v),
                   isLoadingQr: _isLoadingQr,
                   qrImageUrl: _qrImageUrl,
-                  opController: _opController),
-
-            if (_selectedPayment == 'otros')
-              OtherPaymentPanel(
-                  selectedType: _selectedOtherType,
-                  onTypeChanged: (v) => setState(() => _selectedOtherType = v),
-                  refController: _referenceController),
-
-            const SizedBox(height: 30),
-
-            // 3. RESUMEN DEL MONTO (AQUÍ ESTABA EL ERROR)
-            AmountSummary(total: total), // <-- ¡Esta línea faltaba!
-
-            const SizedBox(height: 30),
-
-            // 4. FOOTER
-            BoletaFooter(
+                  opController: _opController,
+                ),
+              const SizedBox(height: 20),
+              AmountSummary(total: total),
+              const SizedBox(height: 30),
+              BoletaFooter(
                 total: total,
                 isProcessing: _isProcessing,
-                onProcess: () => _validarYFinalizar(total, cart)),
-            const SizedBox(height: 30),
-          ],
+                onProcess: () => _validarYFinalizar(total, cart),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // --- UTILIDADES ---
   void _showNotice(String msg, IconData icon, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      backgroundColor: color,
-      behavior: SnackBarBehavior.floating,
-      content: Row(children: [
-        Icon(icon, color: Colors.white),
-        const SizedBox(width: 10),
-        Text(msg)
-      ]),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: color,
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(msg),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSuccessDialog(double total, CartProvider cart) {
@@ -323,49 +251,40 @@ class _BoletaScreenState extends State<BoletaScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Venta Exitosa", textAlign: TextAlign.center),
-        content: const Text("La boleta se ha generado correctamente.",
-            textAlign: TextAlign.center),
-        actionsAlignment: MainAxisAlignment.center,
         actions: [
-          ElevatedButton.icon(
+          ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              if (_pdfPath != null) {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            ReceiptViewScreen(pdfPath: _pdfPath!, saleData: {
-                              'id': 'B001-NEW',
-                              'type': 'Boleta',
-                              'amount': total,
-                              'date': 'Ahora',
-                              'customer_name':
-                                  '${_nombreController.text} ${_apellidoController.text}',
-                              'items': cart.items
-                                  .map((e) => {
-                                        'qty': e.quantity,
-                                        'name': e.name,
-                                        'total': e.price * e.quantity
-                                      })
-                                  .toList()
-                            })));
-              }
+              // ✅ pushReplacement: Elimina BoletaScreen de la pila
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReceiptViewScreen(
+                    pdfPath: _pdfPath ?? '',
+                    pdfBytes: _pdfBytes,
+                    saleData: {
+                      'id': 'PROCESADO',
+                      'type': 'Boleta',
+                      'amount': total,
+                      'date': 'Ahora',
+                      'customer_name':
+                          '${_nombreController.text} ${_apellidoController.text}',
+                      'items': cart.items
+                          .map(
+                            (e) => {
+                              'qty': e.quantity,
+                              'name': e.name,
+                              'total': e.price * e.quantity,
+                            },
+                          )
+                          .toList(),
+                    },
+                  ),
+                ),
+              );
             },
-            icon: const Icon(Symbols.visibility),
-            label: const Text("VER BOLETA"),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryP,
-                foregroundColor: Colors.white),
-          ),
-          TextButton(
-            onPressed: () {
-              cart.clearCart();
-              context.go('/home');
-            },
-            child: const Text("SALIR"),
+            child: const Text("VER BOLETA"),
           ),
         ],
       ),

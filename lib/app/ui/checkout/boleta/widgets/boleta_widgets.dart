@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
 
-// --- A. INPUT PERSONALIZADO (Texto/Números) ---
+// --- A. INPUT PERSONALIZADO ---
 class BoletaInputField extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -49,7 +49,7 @@ class BoletaInputField extends StatelessWidget {
   }
 }
 
-// --- B. SELECTOR DNI / CARNET DE EXTRANJERÍA (Para Boleta) ---
+// --- B. SELECTOR DNI / CE ---
 class ClientHeaderSection extends StatelessWidget {
   final String tipoDocumento;
   final Function(String) onTypeChanged;
@@ -76,20 +76,16 @@ class ClientHeaderSection extends StatelessWidget {
             color: AppColors.primaryS,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
-            children: [
-              _buildTypeBtn("DNI"),
-              _buildTypeBtn("CE"),
-            ],
-          ),
+          child: Row(children: [_buildTypeBtn("DNI"), _buildTypeBtn("CE")]),
         ),
         const SizedBox(height: 15),
         Row(
           children: [
             Expanded(
               child: BoletaInputField(
-                label:
-                    tipoDocumento == 'DNI' ? "DNI (8 dígitos)" : "Carnet Ext.",
+                label: tipoDocumento == 'DNI'
+                    ? "DNI (8 dígitos)"
+                    : "Carnet Ext.",
                 icon: Symbols.badge,
                 controller: docController,
                 isNumeric: true,
@@ -114,12 +110,15 @@ class ClientHeaderSection extends StatelessWidget {
                             width: 24,
                             height: 24,
                             child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2))
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                         : const Icon(Symbols.search, color: Colors.white),
                   ),
                 ),
               ),
-            ]
+            ],
           ],
         ),
       ],
@@ -152,7 +151,7 @@ class ClientHeaderSection extends StatelessWidget {
   }
 }
 
-// --- C. SELECTOR DE MÉTODOS DE PAGO ---
+// --- C. MÉTODOS DE PAGO ---
 class PaymentMethodsSelector extends StatelessWidget {
   final String selectedPayment;
   final Function(String) onPaymentChanged;
@@ -202,7 +201,7 @@ class PaymentMethodsSelector extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -234,7 +233,7 @@ class CashPaymentPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primaryS,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.primaryP.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.primaryP.withOpacity(0.1)),
       ),
       child: Column(
         children: [
@@ -242,7 +241,7 @@ class CashPaymentPanel extends StatelessWidget {
             controller: controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d*'))
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d*')),
             ],
             onChanged: onChanged,
             textAlign: TextAlign.center,
@@ -262,9 +261,13 @@ class CashPaymentPanel extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("VUELTO:",
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: AppColors.darkT)),
+              const Text(
+                "VUELTO:",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkT,
+                ),
+              ),
               Text(
                 "S/. ${vuelto.toStringAsFixed(2)}",
                 style: TextStyle(
@@ -316,14 +319,27 @@ class DigitalWalletPanel extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           if (isLoadingQr)
-            const CircularProgressIndicator()
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: CircularProgressIndicator(),
+            )
           else if (qrImageUrl != null)
             Padding(
               padding: const EdgeInsets.all(10),
-              child: CachedNetworkImage(imageUrl: qrImageUrl!, height: 180),
+              child: CachedNetworkImage(
+                imageUrl: qrImageUrl!,
+                height: 180,
+                placeholder: (context, url) =>
+                    const CircularProgressIndicator(),
+                errorWidget: (context, url, error) =>
+                    const Icon(Symbols.broken_image, size: 80),
+              ),
             )
           else
-            const Icon(Symbols.qr_code_2, size: 80),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Icon(Symbols.qr_code_2, size: 80, color: Colors.grey),
+            ),
           BoletaInputField(
             label: "Nro. Operación",
             icon: Symbols.receipt_long,
@@ -340,8 +356,13 @@ class DigitalWalletPanel extends StatelessWidget {
       child: ActionChip(
         label: Text(label),
         onPressed: () => onWalletChanged(value),
-        backgroundColor:
-            isSelected ? AppColors.primaryP.withValues(alpha: 0.2) : null,
+        backgroundColor: isSelected
+            ? AppColors.primaryP.withOpacity(0.2)
+            : null,
+        labelStyle: TextStyle(
+          color: isSelected ? AppColors.primaryP : AppColors.semidarkT,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }
@@ -373,7 +394,9 @@ class OtherPaymentPanel extends StatelessWidget {
           const Text(
             "Tipo de Transacción",
             style: TextStyle(
-                fontWeight: FontWeight.bold, color: AppColors.semidarkT),
+              fontWeight: FontWeight.bold,
+              color: AppColors.semidarkT,
+            ),
           ),
           const SizedBox(height: 15),
           Row(
@@ -417,9 +440,11 @@ class OtherPaymentPanel extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(icon,
-                  size: 20,
-                  color: isSelected ? Colors.white : AppColors.semidarkT),
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? Colors.white : AppColors.semidarkT,
+              ),
               Text(
                 label,
                 style: TextStyle(
@@ -452,9 +477,13 @@ class AmountSummary extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text("Monto Final:",
-              style: TextStyle(
-                  fontWeight: FontWeight.w600, color: AppColors.semidarkT)),
+          const Text(
+            "Monto Final:",
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: AppColors.semidarkT,
+            ),
+          ),
           Text(
             "S/. ${total.toStringAsFixed(2)}",
             style: const TextStyle(
@@ -492,13 +521,23 @@ class BoletaFooter extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryP,
           foregroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
         child: isProcessing
-            ? const CircularProgressIndicator(color: Colors.white)
-            : const Text("REALIZAR VENTA",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              )
+            : const Text(
+                "REALIZAR VENTA",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
       ),
     );
   }
