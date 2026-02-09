@@ -26,10 +26,7 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
   final TextEditingController _ipController = TextEditingController();
   bool _testingNet = false;
   bool? _netStatus;
-
-  // ✅ CORREGIDO: Ahora es final porque solo modificamos su contenido, no la referencia
   final List<String> _networkDevices = [];
-
   bool _scanningNet = false;
 
   @override
@@ -37,15 +34,27 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadSavedIp();
-    _scanBluetooth(); // Escanear Bluetooth automáticamente al abrir
+    _scanBluetooth(); // Escaneo automático de Bluetooth al abrir
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _ipController.dispose();
+    super.dispose();
   }
 
   void _loadSavedIp() async {
     final prefs = await SharedPreferences.getInstance();
-    _ipController.text = prefs.getString('saved_printer_ip') ?? '192.168.1.87';
+    if (mounted) {
+      setState(() {
+        _ipController.text =
+            prefs.getString('saved_printer_ip') ?? '192.168.1.87';
+      });
+    }
   }
 
-  // --- BLUETOOTH ---
+  // --- LÓGICA BLUETOOTH ---
   void _scanBluetooth() async {
     if (!mounted) return;
     setState(() => _scanningBT = true);
@@ -58,7 +67,7 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
     }
   }
 
-  // --- RED: ESCANEO ---
+  // --- LÓGICA RED ---
   void _scanNetwork() async {
     setState(() {
       _scanningNet = true;
@@ -76,16 +85,15 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
     });
   }
 
-  // --- RED: PRUEBA MANUAL ---
   void _testIp(String ipToTest) async {
     if (ipToTest.isEmpty) return;
-
-    _ipController.text = ipToTest; // Actualizar campo visual
 
     setState(() {
       _testingNet = true;
       _netStatus = null;
     });
+
+    // ✅ Llamada corregida al método del servicio
     final success = await _printerService.testNetworkConnection(ipToTest, 9100);
 
     if (mounted) {
@@ -95,9 +103,8 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
       });
 
       if (success) {
-        // Guardar la IP exitosa para futuras veces
         final prefs = await SharedPreferences.getInstance();
-        prefs.setString('saved_printer_ip', ipToTest);
+        await prefs.setString('saved_printer_ip', ipToTest);
       }
     }
   }
@@ -114,14 +121,18 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
         children: [
           const SizedBox(height: 10),
           Container(
-              height: 4,
-              width: 40,
-              decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2))),
+            height: 4,
+            width: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           const SizedBox(height: 15),
-          const Text("Seleccionar Impresora",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            "Seleccionar Impresora",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 15),
           TabBar(
             controller: _tabController,
@@ -152,24 +163,13 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
       children: [
         if (_scanningBT)
           const LinearProgressIndicator(
-              color: Color(0xFF6C3082), backgroundColor: Color(0xFFF3E5F5)),
+            color: Color(0xFF6C3082),
+            backgroundColor: Color(0xFFF3E5F5),
+          ),
         Expanded(
           child: _bluetoothDevices.isEmpty && !_scanningBT
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Symbols.bluetooth_disabled,
-                          size: 50, color: Colors.grey[300]),
-                      const SizedBox(height: 10),
-                      const Text(
-                          "No se encontraron dispositivos Bluetooth vinculados"),
-                      TextButton(
-                          onPressed: _scanBluetooth,
-                          child: const Text("Reintentar"))
-                    ],
-                  ),
-                )
+              ? _buildEmptyState(Symbols.bluetooth_disabled,
+                  "No se encontraron dispositivos vinculados", _scanBluetooth)
               : ListView.builder(
                   itemCount: _bluetoothDevices.length,
                   itemBuilder: (context, index) {
@@ -181,7 +181,6 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
                       subtitle: Text(device.macAdress),
                       trailing: const Icon(Symbols.chevron_right),
                       onTap: () {
-                        // Al seleccionar, cerramos modal y enviamos la MAC
                         widget.onPrinterSelected('BT', device.macAdress);
                         Navigator.pop(context);
                       },
@@ -196,7 +195,6 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
   Widget _buildNetworkTab() {
     return Column(
       children: [
-        // 1. INPUT MANUAL
         Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
@@ -221,7 +219,6 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Botón Check
                   IconButton.filled(
                     onPressed:
                         _testingNet ? null : () => _testIp(_ipController.text),
@@ -251,100 +248,90 @@ class _PrinterSelectorModalState extends State<PrinterSelectorModal>
             ],
           ),
         ),
-
         const Divider(height: 1),
-
-        // 2. ESCÁNER DE RED
-        Container(
-          width: double.infinity,
-          color: Colors.grey[50],
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Escáner de Red Local",
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.grey)),
-              TextButton.icon(
-                onPressed: _scanningNet ? null : _scanNetwork,
-                icon: _scanningNet
-                    ? const SizedBox(
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.refresh, size: 18),
-                label: Text(_scanningNet ? "Escaneando..." : "Escanear"),
-              )
-            ],
-          ),
-        ),
-
+        _buildScannerHeader(),
         if (_scanningNet)
           const LinearProgressIndicator(
               color: Color(0xFF6C3082), backgroundColor: Color(0xFFF3E5F5)),
-
-        // 3. RESULTADOS DEL ESCÁNER
         Expanded(
           child: _networkDevices.isEmpty && !_scanningNet
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Symbols.wifi_find,
-                          size: 40, color: Colors.grey[300]),
-                      const SizedBox(height: 10),
-                      const Text("Presiona 'Escanear' para buscar ticketeras",
-                          style: TextStyle(color: Colors.grey)),
-                    ],
-                  ),
-                )
+              ? _buildEmptyState(Symbols.wifi_find,
+                  "Presiona 'Escanear' para buscar ticketeras", _scanNetwork)
               : ListView.builder(
                   itemCount: _networkDevices.length,
                   itemBuilder: (context, index) {
                     final ip = _networkDevices[index];
                     return ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Color(0xFFE0F2F1),
-                        child: Icon(Symbols.print, color: Color(0xFF00695C)),
-                      ),
+                      leading: const Icon(Symbols.print),
                       title: const Text("Impresora ESC/POS"),
                       subtitle: Text(ip),
-                      trailing: ElevatedButton(
-                        onPressed: () {
-                          _testIp(ip); // Selecciona y prueba
-                        },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 10)),
-                        child: const Text("Probar"),
-                      ),
+                      onTap: () => _testIp(ip),
                     );
                   },
                 ),
         ),
-
-        // 4. BOTÓN USAR IP MANUAL (Si el test pasó)
-        if (_netStatus == true)
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: 45,
-              child: ElevatedButton(
-                onPressed: () {
-                  widget.onPrinterSelected('NET', _ipController.text);
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6C3082),
-                    foregroundColor: Colors.white),
-                child: const Text("USAR ESTA IMPRESORA"),
-              ),
-            ),
-          )
+        if (_netStatus == true) _buildUseButton(),
       ],
+    );
+  }
+
+  Widget _buildEmptyState(IconData icon, String message, VoidCallback onRetry) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 40, color: Colors.grey[300]),
+          const SizedBox(height: 10),
+          Text(message, style: const TextStyle(color: Colors.grey)),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannerHeader() {
+    return Container(
+      width: double.infinity,
+      color: Colors.grey[50],
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text("Escáner de Red Local",
+              style:
+                  TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+          TextButton.icon(
+            onPressed: _scanningNet ? null : _scanNetwork,
+            icon: _scanningNet
+                ? const SizedBox(
+                    width: 10,
+                    height: 10,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh, size: 18),
+            label: Text(_scanningNet ? "Buscando..." : "Escanear"),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUseButton() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: SizedBox(
+        width: double.infinity,
+        height: 45,
+        child: ElevatedButton(
+          onPressed: () {
+            widget.onPrinterSelected('NET', _ipController.text);
+            Navigator.pop(context);
+          },
+          style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C3082),
+              foregroundColor: Colors.white),
+          child: const Text("USAR ESTA IMPRESORA"),
+        ),
+      ),
     );
   }
 }

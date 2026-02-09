@@ -24,11 +24,13 @@ class FacturaScreen extends StatefulWidget {
 }
 
 class _FacturaScreenState extends State<FacturaScreen> {
+  // Estado de Pago
   String _selectedPayment = 'efectivo';
-  String _digitalWallet = 'yape'; // ✅ Valores posibles: 'yape' o 'plin'
-  String _selectedOtherType = 'card'; // ✅ card, transfers, depositis, others
+  String _digitalWallet = 'yape';
+  String _selectedOtherType = 'card';
   final String _tipoDocumento = 'RUC';
 
+  // Controladores
   final _rucController = TextEditingController();
   final _razonSocialController = TextEditingController();
   final _direccionController = TextEditingController();
@@ -36,10 +38,12 @@ class _FacturaScreenState extends State<FacturaScreen> {
   final _opController = TextEditingController();
   final _referenceController = TextEditingController();
 
+  // Servicios
   final _salesService = SalesService();
   final _customerService = CustomerService();
   final _paymentService = PaymentService();
 
+  // Variables de Estado
   double _vuelto = 0.0;
   bool _isProcessing = false;
   bool _isSearchingRuc = false;
@@ -113,10 +117,23 @@ class _FacturaScreenState extends State<FacturaScreen> {
   }
 
   Future<void> _validarYFinalizar(double total, CartProvider cart) async {
-    if (_razonSocialController.text.trim().isEmpty ||
-        _direccionController.text.trim().isEmpty) {
+    String businessName = _razonSocialController.text.trim();
+    final address = _direccionController.text.trim();
+
+    // ✅ RECORTE AUTOMÁTICO A 80 CARACTERES (Para INDUSTRIAL MADERERA...)
+    if (businessName.length > 80) {
+      businessName = businessName.substring(0, 80);
+    }
+
+    if (businessName.length < 3) {
+      _showNotice("Razón Social muy corta (Mín. 3 letras)", Symbols.warning,
+          Colors.orange);
+      return;
+    }
+
+    if (address.isEmpty) {
       _showNotice(
-          "Complete Razón Social y Dirección", Symbols.domain, Colors.orange);
+          "Ingrese la Dirección Fiscal", Symbols.location_on, Colors.orange);
       return;
     }
 
@@ -131,29 +148,24 @@ class _FacturaScreenState extends State<FacturaScreen> {
 
     setState(() => _isProcessing = true);
 
-    // ✅ LÓGICA DE MAPEADO DINÁMICO DE PAGO
     String finalPaymentMethod = "";
     String? finalCode;
 
     if (_selectedPayment == 'efectivo') {
       finalPaymentMethod = "cash";
     } else if (_selectedPayment == 'yape') {
-      finalPaymentMethod = _digitalWallet; // Enviará "yape" o "plin"
+      finalPaymentMethod = _digitalWallet;
       finalCode = _opController.text;
     } else {
-      finalPaymentMethod =
-          _selectedOtherType; // card, transfers, depositis, others
+      finalPaymentMethod = _selectedOtherType;
       finalCode = _referenceController.text;
     }
 
     final orderData = {
       "type_voucher": "factura",
       "document_type": _tipoDocumento,
-      "document_number": int.tryParse(_rucController.text) ?? 0,
-      "customer": {
-        "business_name": _razonSocialController.text.trim(),
-        "tax_address": _direccionController.text.trim()
-      },
+      "document_number": _rucController.text.trim(),
+      "customer": {"business_name": businessName, "tax_address": address},
       "payment_method": finalPaymentMethod,
       if (finalCode != null && finalCode.isNotEmpty)
         "payment_method_code": finalCode,
@@ -170,7 +182,10 @@ class _FacturaScreenState extends State<FacturaScreen> {
 
     try {
       final res = await _salesService.createOrder(orderData);
-      if (res.data['voucher'] != null) {
+      String? voucherNumber;
+
+      if (res.data != null && res.data['voucher'] != null) {
+        voucherNumber = res.data['voucher']['number'];
         String rawBase64 = res.data['voucher']['content']
             .toString()
             .replaceAll(RegExp(r'\s+'), '');
@@ -183,8 +198,11 @@ class _FacturaScreenState extends State<FacturaScreen> {
         await file.writeAsBytes(bytes, flush: true);
         setState(() => _pdfPath = file.path);
       }
-      _showSuccessDialog(total, cart);
+
+      _showSuccessDialog(total, cart, voucherNumber);
     } catch (e) {
+      // ✅ LOG DE ERROR GENERAL (Elimina la necesidad de importar Dio)
+      debugPrint("❌ ERROR API FACTURA: $e");
       _showNotice("Error al procesar factura", Symbols.error, Colors.red);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -241,8 +259,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                 DigitalWalletPanel(
                     selectedWallet: _digitalWallet,
                     onWalletChanged: (v) {
-                      setState(() =>
-                          _digitalWallet = v); // ✅ Actualiza a "yape" o "plin"
+                      setState(() => _digitalWallet = v);
                       _cargarImagenQr(v);
                     },
                     isLoadingQr: _isLoadingQr,
@@ -310,10 +327,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
           children: [
             Icon(icon, color: isSelected ? Colors.white : Colors.grey),
             Text(label,
-                style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -333,7 +348,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
         ])));
   }
 
-  void _showSuccessDialog(double total, CartProvider cart) {
+  void _showSuccessDialog(
+      double total, CartProvider cart, String? voucherNumber) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -356,17 +372,21 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     context,
                     MaterialPageRoute(
                         builder: (_) => ReceiptViewScreen(
-                              pdfPath: _pdfPath!,
+                              pdfPath: _pdfPath ?? '',
                               pdfBytes: _pdfBytes,
                               saleData: {
-                                'id': 'PROCESADA',
+                                'id': voucherNumber ?? 'FACTURA ELECTRÓNICA',
                                 'type': 'Factura',
                                 'amount': total,
-                                'customer_name': _razonSocialController.text,
+                                'customer_name':
+                                    _razonSocialController.text.trim(),
+                                'doc_number': _rucController.text.trim(),
                                 'items': cart.items
                                     .map((e) => {
                                           'qty': e.quantity,
                                           'name': e.name,
+                                          'price': e
+                                              .price, //  Incluimos Precio Unitario para el ticket
                                           'total': e.price * e.quantity
                                         })
                                     .toList()

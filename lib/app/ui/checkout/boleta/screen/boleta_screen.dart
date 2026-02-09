@@ -24,8 +24,8 @@ class BoletaScreen extends StatefulWidget {
 
 class _BoletaScreenState extends State<BoletaScreen> {
   String _selectedPayment = 'efectivo';
-  String _digitalWallet = 'yape'; // ✅ Valores posibles: 'yape' o 'plin'
-  String _selectedOtherType = 'card'; // ✅ card, transfers, depositis, others
+  String _digitalWallet = 'yape';
+  String _selectedOtherType = 'card';
   String _tipoDocumento = 'DNI';
 
   final _docNumberController = TextEditingController();
@@ -122,25 +122,23 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
     setState(() => _isProcessing = true);
 
-    // ✅ LÓGICA DE MAPEADO DINÁMICO DE PAGO
     String finalPaymentMethod = "";
     String? finalCode;
 
     if (_selectedPayment == 'efectivo') {
       finalPaymentMethod = "cash";
     } else if (_selectedPayment == 'yape') {
-      finalPaymentMethod = _digitalWallet; // Enviará "yape" o "plin"
+      finalPaymentMethod = _digitalWallet;
       finalCode = _opController.text;
     } else {
-      finalPaymentMethod =
-          _selectedOtherType; // card, transfers, depositis, others
+      finalPaymentMethod = _selectedOtherType;
       finalCode = _referenceController.text;
     }
 
     final orderData = {
       "type_voucher": "boleta",
       "document_type": _tipoDocumento,
-      "document_number": int.tryParse(_docNumberController.text) ?? 0,
+      "document_number": _docNumberController.text.trim(),
       "customer": {
         "name": _nombreController.text.trim(),
         "last_name": _apellidoController.text.trim()
@@ -161,10 +159,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
 
     try {
       final res = await _salesService.createOrder(orderData);
-      if (res.data['voucher'] != null) {
-        String rawBase64 = res.data['voucher']['content']
-            .toString()
-            .replaceAll(RegExp(r'\s+'), '');
+      final voucherData = res.data['voucher'];
+
+      if (voucherData != null) {
+        String rawBase64 =
+            voucherData['content'].toString().replaceAll(RegExp(r'\s+'), '');
         final bytes = base64Decode(rawBase64);
         _pdfBytes = bytes;
 
@@ -174,7 +173,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
         await file.writeAsBytes(bytes, flush: true);
         setState(() => _pdfPath = file.path);
       }
-      _showSuccessDialog(total, cart);
+      _showSuccessDialog(total, cart, voucherData);
     } catch (e) {
       _showNotice("Error al procesar venta", Symbols.error, Colors.red);
     } finally {
@@ -234,8 +233,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
                 DigitalWalletPanel(
                     selectedWallet: _digitalWallet,
                     onWalletChanged: (v) {
-                      setState(() =>
-                          _digitalWallet = v); // ✅ Actualiza a "yape" o "plin"
+                      setState(() => _digitalWallet = v);
                       _cargarImagenQr(v);
                     },
                     isLoadingQr: _isLoadingQr,
@@ -298,17 +296,11 @@ class _BoletaScreenState extends State<BoletaScreen> {
           border: Border.all(
               color: isSelected ? AppColors.primaryP : Colors.grey.shade300),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.grey),
-            Text(label,
-                style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold)),
-          ],
-        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: isSelected ? Colors.white : Colors.grey),
+          Text(label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))
+        ]),
       ),
     );
   }
@@ -324,7 +316,7 @@ class _BoletaScreenState extends State<BoletaScreen> {
         ])));
   }
 
-  void _showSuccessDialog(double total, CartProvider cart) {
+  void _showSuccessDialog(double total, CartProvider cart, dynamic voucher) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -350,15 +342,19 @@ class _BoletaScreenState extends State<BoletaScreen> {
                               pdfPath: _pdfPath ?? '',
                               pdfBytes: _pdfBytes,
                               saleData: {
-                                'id': 'PROCESADO',
+                                'id': voucher?['number'] ?? 'B001-000',
                                 'type': 'Boleta',
                                 'amount': total,
                                 'customer_name':
                                     '${_nombreController.text} ${_apellidoController.text}',
+                                'doc_number': _docNumberController.text.trim(),
+                                'date': voucher?['date'] ?? '09/02/2026',
+                                'qr_content': voucher?['external_id'] ?? '',
                                 'items': cart.items
                                     .map((e) => {
                                           'qty': e.quantity,
                                           'name': e.name,
+                                          'price': e.price,
                                           'total': e.price * e.quantity
                                         })
                                     .toList()

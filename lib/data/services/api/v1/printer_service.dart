@@ -1,5 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data'; // ✅ Necesario para manejar bytes de imagen
+
+import 'package:flutter/services.dart'
+    show rootBundle; // ✅ Necesario para cargar assets
+import 'package:image/image.dart'
+    as img; // ✅ Necesario para procesar la imagen para la impresora
+
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
@@ -7,35 +14,24 @@ import 'dart:developer' as dev;
 
 class PrinterService {
   // ==========================================================
-  // 1. UTILIDADES DE BÚSQUEDA Y DIAGNÓSTICO
+  // 1. UTILIDADES Y DIAGNÓSTICO
   // ==========================================================
-
-  /// Obtiene la lista de dispositivos Bluetooth ya emparejados en el celular
+  // (Esta sección no cambia, se mantiene igual)
   Future<List<BluetoothInfo>> getPairedBluetooths() async {
     try {
-      final List<BluetoothInfo> list =
-          await PrintBluetoothThermal.pairedBluetooths;
-      return list;
+      return await PrintBluetoothThermal.pairedBluetooths;
     } catch (e) {
       dev.log("Error buscando bluetooths: $e");
       return [];
     }
   }
 
-  /// Escanea la red WiFi local buscando dispositivos con el puerto 9100 abierto (Ticketeras)
   Stream<String> scanNetworkPrinters() async* {
     final info = NetworkInfo();
     String? wifiIp = await info.getWifiIP();
+    if (wifiIp == null) return;
 
-    if (wifiIp == null) {
-      dev.log("⚠️ No estás conectado a WiFi. No se puede escanear la red.");
-      return;
-    }
-
-    // Obtenemos la subred (Ej: si tu IP es 192.168.1.50 -> '192.168.1')
     final String subnet = wifiIp.substring(0, wifiIp.lastIndexOf('.'));
-
-    // Lista de futuros para chequear IPs en paralelo (del 1 al 254)
     final List<Future<String?>> checks = [];
 
     for (int i = 1; i < 255; i++) {
@@ -43,29 +39,23 @@ class PrinterService {
       checks.add(_checkPort(ip, 9100));
     }
 
-    // A medida que las IPs responden, las enviamos a la UI
     for (final future in checks) {
       final result = await future;
-      if (result != null) {
-        yield result;
-      }
+      if (result != null) yield result;
     }
   }
 
-  /// Verifica rápidamente si una IP tiene un puerto abierto (Ping técnico)
   Future<String?> _checkPort(String ip, int port) async {
     try {
-      // Timeout corto (200ms) para escanear rápido toda la red
       final socket = await Socket.connect(ip, port,
           timeout: const Duration(milliseconds: 200));
       socket.destroy();
-      return ip; // ¡Respondió! Es una impresora.
+      return ip;
     } catch (e) {
       return null;
     }
   }
 
-  /// Prueba de conexión manual (Ping más largo para verificar estabilidad)
   Future<bool> testNetworkConnection(String ip, int port) async {
     try {
       final socket =
@@ -73,149 +63,214 @@ class PrinterService {
       socket.destroy();
       return true;
     } catch (e) {
+      dev.log("Error de conexión manual a $ip: $e");
       return false;
     }
   }
 
   // ==========================================================
-  // 2. MÉTODOS DE IMPRESIÓN (RED Y BLUETOOTH)
+  // 2. MÉTODOS DE IMPRESIÓN
   // ==========================================================
-
-  /// Imprimir en Ticketera de Red (Ethernet/WiFi)
+  // (Esta sección no cambia, se mantiene igual)
   Future<void> printNetwork(
       String ip, int port, Map<String, dynamic> sale) async {
     try {
-      dev.log("🖨️ Conectando a Ticketera de Red: $ip:$port");
-
       final socket =
           await Socket.connect(ip, port, timeout: const Duration(seconds: 5));
       final List<int> bytes = await _generateTicket(sale);
-
       socket.add(bytes);
       await socket.flush();
       await socket.close();
-      dev.log("✅ Ticket enviado por Red exitosamente");
     } catch (e) {
-      dev.log("❌ Error de Red: $e");
       throw Exception("No se pudo conectar a la ticketera en $ip");
     }
   }
 
-  /// Imprimir en Impresora Portátil (Bluetooth)
   Future<void> printBluetooth(
       String macAddress, Map<String, dynamic> sale) async {
     try {
-      dev.log("🖨️ Conectando a Bluetooth: $macAddress");
-
       final bool connected =
           await PrintBluetoothThermal.connect(macPrinterAddress: macAddress);
-
-      if (!connected) {
-        throw Exception(
-            "No se pudo conectar al dispositivo Bluetooth. Verifica que esté encendido.");
-      }
-
+      if (!connected) throw Exception("No se pudo conectar al Bluetooth.");
       final List<int> bytes = await _generateTicket(sale);
-      final result = await PrintBluetoothThermal.writeBytes(bytes);
-
-      dev.log("✅ Ticket enviado por Bluetooth. Resultado: $result");
+      await PrintBluetoothThermal.writeBytes(bytes);
     } catch (e) {
-      dev.log("❌ Error Bluetooth: $e");
       rethrow;
     }
   }
 
   // ==========================================================
-  // 3. DISEÑADOR DEL TICKET (ESC/POS)
+  // 🆕 FUNCIÓN AUXILIAR PARA CARGAR IMAGEN DE ASSETS
+  // ==========================================================
+  Future<img.Image?> _loadImageFromAssets(String path) async {
+    try {
+      final ByteData data = await rootBundle.load(path);
+      final Uint8List bytes = data.buffer.asUint8List();
+      return img.decodeImage(bytes);
+    } catch (e) {
+      dev.log("❌ Error cargando logo para ticket: $e");
+      return null;
+    }
+  }
+
+  // ==========================================================
+  // 3. GENERADOR DE TICKET (ESTILO PROFESIONAL CON LOGO)
   // ==========================================================
   Future<List<int>> _generateTicket(Map<String, dynamic> sale) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
 
-    // --- ENCABEZADO ---
-    bytes += generator.text('ANTTEC MOVIL',
+    // 🆕 --- CARGAR E IMPRIMIR LOGO ---
+    // Cargamos la imagen antes de empezar a generar el ticket
+    final img.Image? logoImage =
+        await _loadImageFromAssets('assets/images/logo_anttec.png');
+
+    if (logoImage != null) {
+      // Redimensionamos la imagen para que quepa bien en el papel térmico (aprox 380px de ancho es seguro)
+      // Esto evita que se imprima basura si la imagen original es muy grande HD.
+      final img.Image resizedLogo = img.copyResize(logoImage, width: 380);
+      // Imprimimos la imagen centrada
+      bytes += generator.image(resizedLogo, align: PosAlign.center);
+      bytes += generator.feed(1); // Un pequeño espacio debajo del logo
+    } else {
+      // Si falla la carga de la imagen, mostramos el texto de respaldo
+      dev.log("⚠️ No se pudo cargar el logo, usando texto de respaldo.");
+      bytes += generator.text('ANTTEC',
+          styles: const PosStyles(
+              align: PosAlign.center,
+              height: PosTextSize.size2,
+              width: PosTextSize.size2,
+              bold: true));
+    }
+
+    // --- ENCABEZADO DE TEXTO (Se mantiene el nombre debajo del logo) ---
+    // Agregamos el nombre de la empresa en texto grande debajo del logo
+    bytes += generator.text('ANTTEC PERÚ',
         styles: const PosStyles(
             align: PosAlign.center,
             height: PosTextSize.size2,
             width: PosTextSize.size2,
             bold: true));
 
-    bytes += generator.text('RUC: 10203040501',
-        styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.text('Direccion: Huancayo, Junin',
-        styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.text('Tel: 999-999-999',
-        styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.hr();
-
-    // --- DATOS DEL DOCUMENTO ---
-    final isFactura = sale['type'] == 'Factura';
-    bytes += generator.text(
-        isFactura ? 'FACTURA ELECTRONICA' : 'BOLETA DE VENTA',
+    bytes += generator.text('PERALTA BERNAOLA ROBBIE WILLIAMS',
         styles: const PosStyles(align: PosAlign.center, bold: true));
-
-    bytes += generator.text('Serie-Correlativo: ${sale['id']}',
-        styles: const PosStyles(align: PosAlign.left));
-    bytes += generator.text('Fecha Emision: ${sale['date']}',
-        styles: const PosStyles(align: PosAlign.left));
+    bytes += generator.text('Av. Giraldez NRO. 274 INT. T-2 Huancayo',
+        styles: const PosStyles(align: PosAlign.center));
+    bytes += generator.text('RUC: 10752359879',
+        styles: const PosStyles(align: PosAlign.center, bold: true));
     bytes += generator.hr();
 
-    // --- DETALLE DE PRODUCTOS ---
+    // --- DATOS DEL COMPROBANTE ---
+    final String typeDoc = sale['type'] ?? 'BOLETA DE VENTA';
+    bytes += generator.text('$typeDoc ELECTRÓNICA',
+        styles: const PosStyles(align: PosAlign.center, bold: true));
+    bytes += generator.text(sale['id'] ?? 'BBB2-000000',
+        styles: const PosStyles(align: PosAlign.center, bold: true));
+    bytes += generator.hr();
+
+    // --- DATOS DEL CLIENTE ---
+    bytes += generator.text(
+        'ADQUIRIENTE: ${sale['customer_name'] ?? 'Público General'}',
+        styles: const PosStyles(bold: true));
+    bytes += generator.text('DNI/RUC: ${sale['doc_number'] ?? '---'}');
+    bytes += generator.text('FECHA EMISIÓN: ${sale['date'] ?? '09/02/2026'}');
+    bytes += generator.text('MONEDA: SOLES');
+    bytes += generator.hr();
+
+    // --- TABLA DE PRODUCTOS (4 COLUMNAS: CAN | DESCRIPCIÓN | P/U | TOTAL) ---
     bytes += generator.row([
-      PosColumn(text: 'Cant', width: 2, styles: const PosStyles(bold: true)),
+      PosColumn(text: 'CAN', width: 1, styles: const PosStyles(bold: true)),
       PosColumn(
-          text: 'Descripcion', width: 7, styles: const PosStyles(bold: true)),
+          text: 'DESCRIPCIÓN', width: 5, styles: const PosStyles(bold: true)),
       PosColumn(
-          text: 'Total',
+          text: 'P/U',
+          width: 3,
+          styles: const PosStyles(bold: true, align: PosAlign.right)),
+      PosColumn(
+          text: 'TOTAL',
           width: 3,
           styles: const PosStyles(bold: true, align: PosAlign.right)),
     ]);
 
-    // Bucle dinámico de productos
     if (sale['items'] != null) {
       for (var item in sale['items']) {
         bytes += generator.row([
-          PosColumn(text: '${item['qty']}', width: 2),
-          PosColumn(text: item['name'], width: 7),
+          PosColumn(text: '${item['qty']}', width: 1),
+          PosColumn(text: '${item['name']}', width: 5),
           PosColumn(
-              text: (item['total'] as double).toStringAsFixed(2),
-              width: 3,
-              styles: const PosStyles(align: PosAlign.right)),
+            text: (item['price'] as double? ?? 0.0).toStringAsFixed(2),
+            width: 3,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
+          PosColumn(
+            text: (item['total'] as double? ?? 0.0).toStringAsFixed(2),
+            width: 3,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
         ]);
       }
     }
-
     bytes += generator.hr();
 
-    // --- TOTALES ---
-    final double amount = sale['amount'] as double;
-    bytes += generator.text(
-        'OP. GRAVADA: S/. ${(amount * 0.82).toStringAsFixed(2)}',
-        styles: const PosStyles(align: PosAlign.right));
-    bytes += generator.text(
-        'IGV (18%): S/. ${(amount * 0.18).toStringAsFixed(2)}',
-        styles: const PosStyles(align: PosAlign.right));
+    // --- RESUMEN DE TOTALES ---
+    final double totalAmount = sale['amount'] as double? ?? 0.0;
+    final double gravada = totalAmount / 1.18;
+    final double igv = totalAmount - gravada;
 
-    bytes += generator.text('TOTAL A PAGAR: S/. ${amount.toStringAsFixed(2)}',
-        styles: const PosStyles(
-            align: PosAlign.right,
-            height: PosTextSize.size2,
-            width: PosTextSize.size1,
-            bold: true));
+    bytes += generator.row([
+      PosColumn(
+          text: 'GRAVADA',
+          width: 8,
+          styles: const PosStyles(align: PosAlign.right)),
+      PosColumn(
+          text: 'S/ ${gravada.toStringAsFixed(2)}',
+          width: 4,
+          styles: const PosStyles(align: PosAlign.right)),
+    ]);
+    bytes += generator.row([
+      PosColumn(
+          text: 'IGV (18%)',
+          width: 8,
+          styles: const PosStyles(align: PosAlign.right)),
+      PosColumn(
+          text: 'S/ ${igv.toStringAsFixed(2)}',
+          width: 4,
+          styles: const PosStyles(align: PosAlign.right)),
+    ]);
+    bytes += generator.row([
+      PosColumn(
+          text: 'TOTAL',
+          width: 8,
+          styles: const PosStyles(align: PosAlign.right, bold: true)),
+      PosColumn(
+          text: 'S/ ${totalAmount.toStringAsFixed(2)}',
+          width: 4,
+          styles: const PosStyles(align: PosAlign.right, bold: true)),
+    ]);
 
-    bytes += generator.hr(ch: '-');
+    bytes += generator.hr();
+    // (Opcional: Si tu API devuelve el monto en letras, descomenta esta línea)
+    // bytes += generator.text('SON: ${sale['amount_letters'] ?? '---'}', styles: const PosStyles(align: PosAlign.left));
+    // bytes += generator.hr();
 
-    // --- PIE DE PÁGINA ---
-    bytes += generator.text('Gracias por su preferencia!',
-        styles: const PosStyles(align: PosAlign.center, bold: true));
-    bytes += generator.text('Representacion impresa de la',
+    // --- PIE DE PÁGINA Y QR LEGAL ---
+    bytes += generator.text('Representación impresa de la $typeDoc',
         styles: const PosStyles(align: PosAlign.center));
-    bytes += generator.text(
-        isFactura ? 'Factura Electronica' : 'Boleta de Venta Electronica',
+    bytes += generator.text('Visite: www.nubefact.com/10752359879',
         styles: const PosStyles(align: PosAlign.center));
 
-    // --- ESPACIO Y CORTE ---
+    bytes += generator.feed(1);
+
+    bytes += generator.qrcode(
+        sale['qr_content'] ?? 'https://www.nubefact.com/consulta',
+        size: QRSize.size4,
+        align: PosAlign.center);
+
+    bytes += generator.feed(1);
+    bytes += generator.text('Emitido desde anttec_movil',
+        styles: const PosStyles(align: PosAlign.center));
+
     bytes += generator.feed(3);
     bytes += generator.cut();
 
