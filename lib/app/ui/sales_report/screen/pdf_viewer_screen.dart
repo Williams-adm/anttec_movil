@@ -46,7 +46,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => PrinterSelectorModal(
         onPrinterSelected: (type, address) {
-          Navigator.pop(context); // Cerrar modal
+          // Check mounted before using context
+          if (mounted) {
+            Navigator.pop(context); // Cerrar modal
+          }
           _procesarImpresion(type, address);
         },
       ),
@@ -71,27 +74,36 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (widget.path.startsWith('http')) {
         setState(() => _isDownloading = true);
         localPath = await _downloadPdfToTemp(widget.path);
+
+        // Check mounted after await
+        if (!mounted) return;
+
         setState(() => _isDownloading = false);
       }
 
       if (type == 'STANDARD') {
         // === OPCIÓN 1: IMPRESORA A4 (HP, EPSON, SISTEMA ANDROID) ===
+        // Note: _printerService.printStandard likely returns a Future, but isn't awaited or doesn't use context internally in a risky way here?
+        // Assuming it's safe or returns Future<void>
         await _printerService.printStandard(localPath);
       } else {
         // === OPCIÓN 2: TICKETERA TÉRMICA (80mm) ===
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("⏳ Procesando imagen para ticketera..."),
-            duration: Duration(seconds: 4),
-            backgroundColor: Colors.blueGrey,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("⏳ Procesando imagen para ticketera..."),
+              duration: Duration(seconds: 4),
+              backgroundColor: Colors.blueGrey,
+            ),
+          );
+        }
 
         bool isBt = (type == 'BT');
         // Enviamos el path local (ya descargado)
         await _printerService.printTicketera(address, localPath, isBt);
 
+        // Check mounted after await
         if (mounted) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -104,8 +116,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         }
       }
     } catch (e) {
-      setState(() => _isDownloading = false);
+      // Check mounted before setting state
       if (mounted) {
+        setState(() => _isDownloading = false);
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         _mostrarErrorDetallado(e.toString());
       }
@@ -189,8 +202,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         await Share.shareXFiles([XFile(widget.path)], text: widget.title);
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Archivo no disponible para compartir")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Archivo no disponible para compartir")));
+      }
     }
   }
 

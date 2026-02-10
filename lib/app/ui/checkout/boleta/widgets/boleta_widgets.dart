@@ -83,9 +83,8 @@ class ClientHeaderSection extends StatelessWidget {
           children: [
             Expanded(
               child: BoletaInputField(
-                label: tipoDocumento == 'DNI'
-                    ? "DNI (8 dígitos)"
-                    : "Carnet Ext.",
+                label:
+                    tipoDocumento == 'DNI' ? "DNI (8 dígitos)" : "Carnet Ext.",
                 icon: Symbols.badge,
                 controller: docController,
                 isNumeric: true,
@@ -233,7 +232,8 @@ class CashPaymentPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primaryS,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.primaryP.withOpacity(0.1)),
+        // ✅ CORREGIDO: Usamos withValues(alpha: 0.1)
+        border: Border.all(color: AppColors.primaryP.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -356,9 +356,9 @@ class DigitalWalletPanel extends StatelessWidget {
       child: ActionChip(
         label: Text(label),
         onPressed: () => onWalletChanged(value),
-        backgroundColor: isSelected
-            ? AppColors.primaryP.withOpacity(0.2)
-            : null,
+        // ✅ CORREGIDO: Usamos withValues(alpha: 0.2)
+        backgroundColor:
+            isSelected ? AppColors.primaryP.withValues(alpha: 0.2) : null,
         labelStyle: TextStyle(
           color: isSelected ? AppColors.primaryP : AppColors.semidarkT,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
