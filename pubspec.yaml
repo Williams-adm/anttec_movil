@@ -15,14 +15,14 @@ dependencies:
   langchain: ^0.8.0
   langchain_mistralai: ^0.3.1+1
 
-  # --- DISENO Y FORMATO ---
+  # --- DISEÑO Y FORMATO ---
   flutter_markdown: ^0.7.1
   flutter_spinkit: ^5.2.1
   cupertino_icons: ^1.0.8
   material_symbols_icons: ^4.2872.1
   cached_network_image: ^3.3.1
 
-  # --- NAVEGACION Y LOGICA ---
+  # --- NAVEGACIÓN Y LÓGICA ---
   go_router: ^16.2.1
   dio: ^5.9.0
   provider: ^6.1.5+1
@@ -36,54 +36,67 @@ dependencies:
   form_field_validator: ^1.1.0
   mobile_scanner: ^6.0.2
 
-  # --- IMPRESION Y PERIFERICOS (MODULO VENTAS) ---
-  # Genera los comandos ESC/POS (negritas, cortes, texto)
+  # --- IMPRESIÓN Y PERIFÉRICOS (MÓDULO VENTAS) ---
+  # Genera los comandos ESC/POS (negritas, cortes, tablas)
   esc_pos_utils_plus: ^2.0.3 
   
-  # Necesario para procesar imagenes internamente
+  # Necesario para procesar el logo e imágenes internamente
   image: ^4.0.17
   
-  # Para manejar la impresora Bluetooth (Version estable)
+  # Para manejar la impresora Bluetooth
   print_bluetooth_thermal: ^1.1.9
   
-  # Para pedir permisos en tiempo de ejecucion
+  # Para pedir permisos en tiempo de ejecución
   permission_handler: ^11.3.0
 
-  # VITAL: Para escanear la red WiFi y encontrar ticketeras IP
+  # Vital para encontrar ticketeras por IP en la red WiFi
   network_info_plus: ^5.0.3
+
+  # --- MANEJO DE DOCUMENTOS Y PDF ---
   path_provider: ^2.1.5
   flutter_pdfview: ^1.4.4
+  syncfusion_flutter_pdfviewer: ^32.2.3
+  
+  # ✅ VITAL PARA TICKETERA: Convierte PDF a Imagen
+  pdfx: ^2.5.0
+
+  # ✅ VITAL PARA IMPRESORA A4: Impresión nativa Android
+  printing: ^5.13.0
+
+  # --- COMPARTIR Y OTROS ---
   share_plus: ^10.1.0
   intl: ^0.20.2
   url_launcher: ^6.3.2
-  syncfusion_flutter_pdfviewer: ^32.2.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  # PAQUETE PARA CAMBIAR EL ICONO
+  
+  # PAQUETE PARA CAMBIAR EL ICONO DE LA APP
   flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
+
+  # CONFIGURACIÓN DE ASSETS
+  # Asegúrate de que tu logo esté en: assets/img/logo.png
   assets:
     - assets/img/
 
 # ==========================================
-# CONFIGURACION DEL ICONO ANTTEC
+# CONFIGURACIÓN DEL ICONO ANTTEC
 # ==========================================
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  # Ruta de tu imagen
   image_path: "assets/img/logo.png"
   
-  # Configuracion iOS
+  # Configuración iOS
   remove_alpha_ios: true
   background_color_ios: "#5E1674"
   
-  # Configuracion Android Adaptativo
+  # Configuración Android Adaptativo
   adaptive_icon_background: "#5E1674"
   adaptive_icon_foreground: "assets/img/logo.png"
   

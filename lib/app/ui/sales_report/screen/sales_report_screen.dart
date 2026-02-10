@@ -5,12 +5,16 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+// LIBRERÍAS PARA DESCARGAR PDF SI ES URL
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+
 // IMPORTS PROPIOS
 import 'package:anttec_movil/data/services/api/v1/printer_service.dart';
 import 'package:anttec_movil/app/ui/sales_report/widgets/printer_selector_modal.dart';
 import 'package:anttec_movil/app/ui/shared/widgets/loader_w.dart';
 import 'package:anttec_movil/app/ui/sales_report/viewmodel/sales_report_viewmodel.dart';
-import 'package:anttec_movil/app/ui/sales_report/screen/pdf_viewer_screen.dart'; // IMPORTA TU VISOR
+import 'package:anttec_movil/app/ui/sales_report/screen/pdf_viewer_screen.dart';
 
 class SalesReportScreen extends StatefulWidget {
   const SalesReportScreen({super.key});
@@ -62,15 +66,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     ].request();
   }
 
-  // --- NUEVA LÓGICA: NAVEGAR AL VISOR INTERNO ---
+  // --- NAVEGAR AL VISOR INTERNO ---
   void _handleViewPdf(String? url, String orderNumber) {
     if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("No hay PDF disponible"),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showSnackBar("No hay PDF disponible", Colors.orange);
       return;
     }
 
@@ -83,7 +82,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     );
   }
 
-  // --- LÓGICA IMPRESIÓN (SIN ERROR DE POP) ---
+  // --- LÓGICA DE IMPRESIÓN ---
   void _handlePrintRequest(int index) async {
     // 1. Mostrar Loader
     showDialog(
@@ -98,18 +97,13 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
 
     if (!mounted) return;
 
-    // 3. CERRAR DIÁLOGO CORRECTAMENTE (Usando rootNavigator)
+    // 3. CERRAR DIÁLOGO CORRECTAMENTE
     Navigator.of(context, rootNavigator: true).pop();
 
     if (saleWithItems != null) {
       _openPrinterModal(saleWithItems);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error al obtener datos de impresión"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar("Error al obtener datos de impresión", Colors.red);
     }
   }
 
@@ -125,26 +119,59 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     );
   }
 
+  // ✅ AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL
   void _executePrint(
     String type,
     String address,
     Map<String, dynamic> sale,
   ) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Imprimiendo ${sale['order_number']}..."),
-        backgroundColor: Colors.black87,
-      ),
-    );
+    final String? pdfUrl = sale['voucher'];
+    if (pdfUrl == null || pdfUrl.isEmpty) {
+      _showSnackBar("El comprobante no tiene PDF asociado", Colors.orange);
+      return;
+    }
+
+    _showSnackBar("Procesando documento...", Colors.black87);
+
     try {
-      if (type == 'NET') {
-        await _printerService.printNetwork(address, 9100, sale);
-      } else {
-        await _printerService.printBluetooth(address, sale);
+      String localPath = pdfUrl;
+
+      // 1. Si es una URL de internet, la descargamos primero
+      if (pdfUrl.startsWith('http')) {
+        localPath =
+            await _downloadPdf(pdfUrl, sale['order_number'] ?? 'ticket');
       }
+
+      // 2. Elegimos el método de impresión
+      if (type == 'STANDARD') {
+        // Opción A: Impresora A4 (Sistema Android)
+        await _printerService.printStandard(localPath);
+      } else {
+        // Opción B: Ticketera (Imagen 80mm)
+        // type puede ser 'BT' (Bluetooth) o 'NET' (Red)
+        await _printerService.printTicketera(address, localPath, type == 'BT');
+      }
+
+      _showSnackBar("✅ Impresión enviada", Colors.green);
     } catch (e) {
       dev.log("Error impresión: $e");
+      _showSnackBar("❌ Error: $e", Colors.red);
     }
+  }
+
+  // Helper para descargar PDF temporalmente
+  Future<String> _downloadPdf(String url, String fileName) async {
+    final dir = await getTemporaryDirectory();
+    final savePath = '${dir.path}/${fileName}_temp.pdf';
+    await Dio().download(url, savePath);
+    return savePath;
+  }
+
+  void _showSnackBar(String msg, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: color),
+    );
   }
 
   // --- UI ---
@@ -467,13 +494,10 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // --- BOTONES ---
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    // LÓGICA DE VISOR INTERNO
                     onPressed: () =>
                         _handleViewPdf(pdfUrl, sale['order_number'] ?? 'Doc'),
                     style: OutlinedButton.styleFrom(
@@ -491,7 +515,6 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
-                    // LÓGICA DE IMPRESIÓN (USA ID de ORDEN)
                     onPressed: () => _handlePrintRequest(index),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: themeColor,

@@ -21,7 +21,7 @@ class ReceiptViewScreen extends StatelessWidget {
     this.pdfBytes,
   });
 
-  /// Abre el visor de PDF pasando la data real para la impresión térmica
+  /// Abre el visor de PDF
   void _openPdfDetail(BuildContext context) {
     Navigator.push(
       context,
@@ -30,7 +30,7 @@ class ReceiptViewScreen extends StatelessWidget {
           path: pdfPath,
           title: saleData['id'] ?? "Comprobante",
           pdfBytes: pdfBytes,
-          saleData: saleData, // ✅ PASAMOS LA DATA REAL PARA LA IMPRESORA
+          // ❌ SE ELIMINÓ 'saleData' PORQUE YA NO ES NECESARIO PARA IMPRIMIR EL PDF
         ),
       ),
     );
@@ -48,12 +48,12 @@ class ReceiptViewScreen extends StatelessWidget {
         context.go('/home');
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F7FA), // Fondo limpio y profesional
+        backgroundColor: const Color(0xFFF4F7FA),
         appBar: AppBar(
           title: const Text("Comprobante Digital",
               style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
           centerTitle: true,
-          automaticallyImplyLeading: false, // Quitamos la flecha de retroceso
+          automaticallyImplyLeading: false,
           backgroundColor: Colors.white,
           elevation: 0,
         ),
