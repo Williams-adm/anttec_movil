@@ -4,13 +4,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:anttec_movil/app/core/styles/colors.dart';
 
-// --- A. INPUT PERSONALIZADO ---
+// --- A. INPUT PERSONALIZADO (MEJORADO PARA BORDES) ---
 class BoletaInputField extends StatelessWidget {
   final String label;
   final IconData icon;
   final TextEditingController controller;
   final bool isNumeric;
   final int? maxLength;
+  final Color? borderColor; // ✅ NUEVO: Color de borde opcional
 
   const BoletaInputField({
     super.key,
@@ -19,6 +20,7 @@ class BoletaInputField extends StatelessWidget {
     required this.controller,
     this.isNumeric = false,
     this.maxLength,
+    this.borderColor, // ✅
   });
 
   @override
@@ -39,9 +41,24 @@ class BoletaInputField extends StatelessWidget {
           prefixIcon: Icon(icon, color: AppColors.primaryP),
           filled: true,
           fillColor: AppColors.primaryS,
+          // ✅ LÓGICA DE BORDE (Si borderColor no es null, se pinta)
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+            borderSide: borderColor != null
+                ? BorderSide(color: borderColor!, width: 1.5)
+                : BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: borderColor != null
+                ? BorderSide(color: borderColor!, width: 1.5)
+                : BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: borderColor != null
+                ? BorderSide(color: borderColor!, width: 2.0)
+                : const BorderSide(color: AppColors.primaryP, width: 2.0),
           ),
         ),
       ),
@@ -232,7 +249,6 @@ class CashPaymentPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primaryS,
         borderRadius: BorderRadius.circular(24),
-        // ✅ CORREGIDO: Usamos withValues(alpha: 0.1)
         border: Border.all(color: AppColors.primaryP.withValues(alpha: 0.1)),
       ),
       child: Column(
@@ -302,6 +318,9 @@ class DigitalWalletPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Determinar longitud máxima visualmente
+    int maxLen = selectedWallet == 'yape' ? 8 : 7;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -340,10 +359,15 @@ class DigitalWalletPanel extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 40),
               child: Icon(Symbols.qr_code_2, size: 80, color: Colors.grey),
             ),
+
+          // ✅ INPUT CON BORDE NEGRO Y LONGITUD DINÁMICA
           BoletaInputField(
             label: "Nro. Operación",
             icon: Symbols.receipt_long,
             controller: opController,
+            isNumeric: true,
+            maxLength: maxLen,
+            borderColor: Colors.black, // Borde negro solicitado
           ),
         ],
       ),
@@ -356,7 +380,6 @@ class DigitalWalletPanel extends StatelessWidget {
       child: ActionChip(
         label: Text(label),
         onPressed: () => onWalletChanged(value),
-        // ✅ CORREGIDO: Usamos withValues(alpha: 0.2)
         backgroundColor:
             isSelected ? AppColors.primaryP.withValues(alpha: 0.2) : null,
         labelStyle: TextStyle(

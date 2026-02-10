@@ -104,6 +104,16 @@ class _BoletaScreenState extends State<BoletaScreen> {
   }
 
   Future<void> _validarYFinalizar(double total, CartProvider cart) async {
+    if (_docNumberController.text.trim().isEmpty) {
+      _showNotice(
+          _tipoDocumento == 'DNI'
+              ? "Falta completar el DNI"
+              : "Falta completar CE",
+          Symbols.badge,
+          Colors.orange);
+      return;
+    }
+
     if (_nombreController.text.trim().isEmpty ||
         _apellidoController.text.trim().isEmpty) {
       _showNotice(
@@ -116,6 +126,23 @@ class _BoletaScreenState extends State<BoletaScreen> {
           double.tryParse(_recibidoController.text.replaceAll(',', '.')) ?? 0.0;
       if (recibido < total) {
         _showNotice("Efectivo insuficiente", Symbols.money_off, Colors.red);
+        return;
+      }
+    } else if (_selectedPayment == 'yape') {
+      final op = _opController.text.trim();
+      if (op.isEmpty) {
+        _showNotice(
+            "Falta el Nro. de Operación", Symbols.receipt_long, Colors.red);
+        return;
+      }
+      if (_digitalWallet == 'yape' && op.length != 8) {
+        _showNotice("Nro. Operación Yape debe tener 8 números", Symbols.error,
+            Colors.red);
+        return;
+      }
+      if (_digitalWallet == 'plin' && op.length != 7) {
+        _showNotice("Nro. Operación Plin debe tener 7 números", Symbols.error,
+            Colors.red);
         return;
       }
     }
@@ -173,7 +200,36 @@ class _BoletaScreenState extends State<BoletaScreen> {
         await file.writeAsBytes(bytes, flush: true);
         setState(() => _pdfPath = file.path);
       }
-      _showSuccessDialog(total, cart, voucherData);
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReceiptViewScreen(
+              pdfPath: _pdfPath ?? '',
+              pdfBytes: _pdfBytes,
+              saleData: {
+                'id': voucherData?['number'] ?? 'B001-000',
+                'type': 'Boleta',
+                'amount': total,
+                'customer_name':
+                    '${_nombreController.text} ${_apellidoController.text}',
+                'doc_number': _docNumberController.text.trim(),
+                'date': voucherData?['date'] ?? '10/02/2026',
+                'qr_content': voucherData?['external_id'] ?? '',
+                'items': cart.items
+                    .map((e) => {
+                          'qty': e.quantity,
+                          'name': e.name,
+                          'price': e.price,
+                          'total': e.price * e.quantity
+                        })
+                    .toList()
+              },
+            ),
+          ),
+        );
+      }
     } catch (e) {
       _showNotice("Error al procesar venta", Symbols.error, Colors.red);
     } finally {
@@ -259,16 +315,18 @@ class _BoletaScreenState extends State<BoletaScreen> {
                         _buildSubtypeButton(
                             "Transf.", Symbols.account_balance, 'transfers'),
                         _buildSubtypeButton(
-                            "Depósito", Symbols.savings, 'depositis'),
+                            "Depósito", Symbols.savings, 'deposits'),
                         _buildSubtypeButton(
                             "Otros", Symbols.more_horiz, 'others'),
                       ],
                     ),
                     const SizedBox(height: 20),
                     BoletaInputField(
-                        label: "Referencia",
-                        icon: Symbols.receipt_long,
-                        controller: _referenceController),
+                      label: "Referencia (opcional)",
+                      icon: Symbols.receipt_long,
+                      controller: _referenceController,
+                      borderColor: Colors.black, // Borde Negro
+                    ),
                   ],
                 ),
               const SizedBox(height: 20),
@@ -312,67 +370,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
         content: Row(children: [
           Icon(icon, color: Colors.white),
           const SizedBox(width: 10),
-          Text(msg)
+          Expanded(
+              child: Text(msg,
+                  style: const TextStyle(fontWeight: FontWeight.bold)))
         ])));
-  }
-
-  void _showSuccessDialog(double total, CartProvider cart, dynamic voucher) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Symbols.check_circle,
-                color: Colors.green, size: 80, fill: 1),
-            const SizedBox(height: 20),
-            const Text("¡Venta Exitosa!",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ReceiptViewScreen(
-                              pdfPath: _pdfPath ?? '',
-                              pdfBytes: _pdfBytes,
-                              saleData: {
-                                'id': voucher?['number'] ?? 'B001-000',
-                                'type': 'Boleta',
-                                'amount': total,
-                                'customer_name':
-                                    '${_nombreController.text} ${_apellidoController.text}',
-                                'doc_number': _docNumberController.text.trim(),
-                                'date': voucher?['date'] ?? '09/02/2026',
-                                'qr_content': voucher?['external_id'] ?? '',
-                                'items': cart.items
-                                    .map((e) => {
-                                          'qty': e.quantity,
-                                          'name': e.name,
-                                          'price': e.price,
-                                          'total': e.price * e.quantity
-                                        })
-                                    .toList()
-                              },
-                            )));
-              },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryP,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15))),
-              child: const Text("VER BOLETA",
-                  style: TextStyle(fontWeight: FontWeight.w900)),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
