@@ -6,7 +6,6 @@ import 'package:dio/dio.dart';
 class ProductService extends ApiService {
   ProductService() : super();
 
-  /// Obtener lista de productos con paginación, filtros y BUSCADOR
   Future<ProductResponse> productAll({
     int page = 1,
     int? brand,
@@ -14,22 +13,20 @@ class ProductService extends ApiService {
     double? priceMax,
     int? category,
     int? subcategory,
-    String? search, // ✅ Nuevo parámetro de búsqueda
+    String? search,
   }) async {
     try {
-      // 1. Construimos el mapa de parámetros dinámicamente
-      final Map<String, dynamic> queryParams = {'page': page};
+      final Map<String, dynamic> queryParams = {
+        'page': page,
+        'per_page': 16,
+      };
 
       if (brand != null) queryParams['brand'] = brand;
       if (priceMin != null) queryParams['priceMin'] = priceMin;
       if (priceMax != null) queryParams['priceMax'] = priceMax;
       if (category != null) queryParams['category'] = category;
       if (subcategory != null) queryParams['subcategory'] = subcategory;
-
-      // ✅ Agregamos la búsqueda si existe texto
-      if (search != null && search.isNotEmpty) {
-        queryParams['search'] = search;
-      }
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
 
       final response = await dio.get(
         '/mobile/products',
@@ -44,19 +41,31 @@ class ProductService extends ApiService {
     }
   }
 
-  /// Obtener el detalle de un producto y una variante específica
+  /// Obtener el detalle.
+  /// ✅ CORRECCIÓN: Si variantId es 0, llamamos al producto base.
   Future<ProductDetailResponse> productDetail({
     required int productId,
     required int variantId,
   }) async {
     try {
-      final response = await dio.get(
-        '/mobile/products/$productId/variants/$variantId',
-      );
+      String endpoint;
+
+      // SI NO HAY VARIANTE (ID 0), LLAMAMOS AL PRODUCTO BASE
+      if (variantId == 0) {
+        endpoint = '/mobile/products/$productId';
+      } else {
+        // SI HAY VARIANTE, LLAMAMOS AL ENDPOINT ESPECÍFICO
+        endpoint = '/mobile/products/$productId/variants/$variantId';
+      }
+
+      final response = await dio.get(endpoint);
 
       return ProductDetailResponse.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? e.message);
+      // Manejo de errores más detallado para debug
+      final msg = e.response?.data['message'] ??
+          "Error de conexión con el servidor (${e.response?.statusCode})";
+      throw Exception(msg);
     } catch (e) {
       throw Exception("Error inesperado al cargar detalle: $e");
     }

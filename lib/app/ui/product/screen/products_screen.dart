@@ -8,10 +8,12 @@ import 'package:anttec_movil/app/ui/product/controllers/products_controller.dart
 
 // --- WIDGETS ---
 import 'package:anttec_movil/app/ui/layout/widgets/home/header_home_w.dart';
-import 'package:anttec_movil/app/ui/layout/widgets/home/search_w.dart'; // ✅ Asegúrate que apunte al SearchW nuevo
+import 'package:anttec_movil/app/ui/layout/widgets/home/search_w.dart';
+import 'package:anttec_movil/app/ui/layout/widgets/home/pagination_controls_w.dart';
 import 'package:anttec_movil/app/ui/layout/widgets/home/category_filter_w.dart';
 import 'package:anttec_movil/app/ui/layout/widgets/home/section_title_w.dart';
 import 'package:anttec_movil/app/ui/product/screen/products_grid.dart';
+// Importar el nuevo widget de paginación
 
 class ProductsScreen extends StatefulWidget {
   final String token;
@@ -43,74 +45,79 @@ class _ProductsScreenState extends State<ProductsScreen>
     final layoutModel = context.watch<LayoutHomeViewmodel>();
 
     return ChangeNotifierProvider(
-      // Asegúrate que ProductsController tenga la lógica de 'onSearchChanged' que hicimos antes
       create: (_) => ProductsController(token: widget.token),
       child: Consumer<ProductsController>(
         builder: (context, controller, _) {
-          return NotificationListener<ScrollNotification>(
-            onNotification: (ScrollNotification scrollInfo) {
-              if (scrollInfo.metrics.pixels >=
-                      scrollInfo.metrics.maxScrollExtent - 200 &&
-                  !controller.loading &&
-                  controller.page < controller.lastPage) {
-                controller.nextPage();
-              }
-              return false;
-            },
-            child: Column(
-              children: [
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    children: [
-                      HeaderHomeW(
-                        profileName: layoutModel.profileName ?? '',
-                        logout: () async {
-                          final success = await layoutModel.logout();
-                          if (success && context.mounted) {
-                            context.goNamed('login');
-                          }
+          return Column(
+            children: [
+              // --- HEADER Y FILTROS (Igual que antes) ---
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  children: [
+                    HeaderHomeW(
+                      profileName: layoutModel.profileName ?? '',
+                      logout: () async {
+                        final success = await layoutModel.logout();
+                        if (success && context.mounted) {
+                          context.goNamed('login');
+                        }
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SearchW(
+                        controller: _searchController,
+                        onChanged: (value) => controller.onSearchChanged(value),
+                        onClear: () => controller.clearSearch(),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: CategoryFilterW(
+                        categories: layoutModel.categories,
+                        brands: layoutModel.brands,
+                        onFilterChanged: (int? categoryId, int? brandId) {
+                          controller.applyFilters(
+                            category: categoryId,
+                            brand: brandId,
+                          );
                         },
                       ),
+                    ),
+                    const SectionTitleW(),
+                  ],
+                ),
+              ),
 
-                      // 🔥 AQUÍ ESTÁ LA CONEXIÓN DEL BUSCADOR 🔥
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: SearchW(
-                          controller: _searchController,
-                          // 1. Cuando el usuario escribe:
-                          onChanged: (value) {
-                            // Llamamos a la función con Debounce del controlador
-                            controller.onSearchChanged(value);
-                          },
-                          // 2. Cuando el usuario presiona la 'X' para limpiar:
-                          onClear: () {
-                            controller.clearSearch();
-                          },
-                        ),
-                      ),
+              // --- CONTENIDO DE PRODUCTOS ---
+              Expanded(
+                child: _buildProductContent(controller),
+              ),
 
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: CategoryFilterW(
-                          categories: layoutModel.categories,
-                          brands: layoutModel.brands,
-                          onFilterChanged: (int? categoryId, int? brandId) {
-                            controller.applyFilters(
-                              category: categoryId,
-                              brand: brandId,
-                            );
-                          },
-                        ),
-                      ),
-                      const SectionTitleW(),
-                    ],
+              // 🔥 AQUÍ ESTÁN LOS BOTONES 1-2-3-4 🔥
+              // Solo se muestran si no está cargando y hay productos
+              if (!controller.loading && controller.products.isNotEmpty)
+                Container(
+                  color: Colors.white, // Fondo blanco para los botones
+                  child: PaginationControlsW(
+                    currentPage: controller.page,
+                    lastPage: controller.lastPage,
+                    onPageChanged: (newPage) {
+                      // Al cambiar de página, subimos el scroll al inicio suavemente
+                      if (_scrollController.hasClients) {
+                        _scrollController.animateTo(
+                          0,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                        );
+                      }
+                      controller.changePage(newPage);
+                    },
                   ),
                 ),
-                Expanded(child: _buildProductContent(controller)),
-              ],
-            ),
+            ],
           );
         },
       ),
@@ -118,11 +125,11 @@ class _ProductsScreenState extends State<ProductsScreen>
   }
 
   Widget _buildProductContent(ProductsController controller) {
-    if (controller.loading && controller.products.isEmpty) {
+    if (controller.loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (controller.error != null && controller.products.isEmpty) {
+    if (controller.error != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -139,28 +146,14 @@ class _ProductsScreenState extends State<ProductsScreen>
     }
 
     if (controller.products.isEmpty) {
-      // Mensaje amigable si buscó algo y no encontró nada
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.search_off, size: 60, color: Colors.grey),
-            const SizedBox(height: 10),
-            Text(
-              _searchController.text.isNotEmpty
-                  ? 'No hay resultados para "${_searchController.text}"'
-                  : 'No hay productos disponibles.',
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      );
+      return const Center(child: Text('No hay productos disponibles.'));
     }
 
+    // Grid Normal (sin loader al final porque ahora usamos paginación)
     return ProductGrid(
       products: controller.products,
       scrollController: _scrollController,
-      isLoadingMore: controller.loading && controller.products.isNotEmpty,
+      isLoadingMore: false, // Ya no necesitamos loader de scroll infinito
     );
   }
 }
