@@ -9,10 +9,10 @@ class ActiveFiltersW extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Escuchamos al controlador
+    // Escuchamos al controlador para saber qué filtros hay
     final controller = context.watch<ProductsController>();
 
-    // Lista de chips a mostrar
+    // Lista donde guardaremos los chips a mostrar
     final List<Widget> activeChips = [];
 
     // 1. Chip de Rango de Precio
@@ -20,18 +20,19 @@ class ActiveFiltersW extends StatelessWidget {
         controller.currentMaxPrice != null) {
       final min = controller.currentMinPrice?.round() ?? 0;
       final max = controller.currentMaxPrice?.round() ?? "∞";
+
       activeChips.add(_buildChip(
         label: "Precio: S/ $min - $max",
         onDeleted: () {
-          // Mantenemos el resto, borramos precio
+          // Al borrar precio, mantenemos categoría, marca y orden, pero limpiamos precio
           controller.applyAdvancedFilters(
             brand: controller.currentBrand,
             category: controller.currentCategory,
             subcategory: controller.currentSubcategory,
             orderBy: controller.currentOrderBy,
             orderDir: controller.currentOrderDir,
-            minPrice: null, // Borrar
-            maxPrice: null, // Borrar
+            minPrice: null, // Reset
+            maxPrice: null, // Reset
           );
         },
       ));
@@ -51,57 +52,25 @@ class ActiveFiltersW extends StatelessWidget {
       activeChips.add(_buildChip(
         label: label,
         onDeleted: () {
+          // Al borrar orden, mantenemos el resto
           controller.applyAdvancedFilters(
             brand: controller.currentBrand,
             category: controller.currentCategory,
             subcategory: controller.currentSubcategory,
             minPrice: controller.currentMinPrice,
             maxPrice: controller.currentMaxPrice,
-            orderBy: null, // Borrar
-            orderDir: null, // Borrar
+            orderBy: null, // Reset
+            orderDir: null, // Reset
           );
         },
       ));
     }
 
-    // 3. Chip de Marca
-    if (controller.currentBrand != null) {
-      // Como solo tenemos el ID en el controller, mostramos un texto genérico
-      // O idealmente pasaríamos el nombre si lo tuviéramos.
-      activeChips.add(_buildChip(
-        label: "Marca Seleccionada",
-        onDeleted: () {
-          controller.applyAdvancedFilters(
-            category: controller.currentCategory,
-            subcategory: controller.currentSubcategory,
-            minPrice: controller.currentMinPrice,
-            maxPrice: controller.currentMaxPrice,
-            orderBy: controller.currentOrderBy,
-            orderDir: controller.currentOrderDir,
-            brand: null, // Borrar
-          );
-        },
-      ));
-    }
+    // ⚠️ NOTA IMPORANTE:
+    // No agregamos Categoría ni Marca aquí, porque esos ya se muestran
+    // en la barra horizontal superior (CategoryFilterW).
 
-    // 4. Chip de Categoría (Opcional, si quieres permitir borrarla desde aquí)
-    if (controller.currentCategory != null) {
-      activeChips.add(_buildChip(
-        label: "Categoría",
-        onDeleted: () {
-          controller.applyAdvancedFilters(
-            brand: controller.currentBrand,
-            minPrice: controller.currentMinPrice,
-            maxPrice: controller.currentMaxPrice,
-            orderBy: controller.currentOrderBy,
-            orderDir: controller.currentOrderDir,
-            category: null, // Borrar
-          );
-        },
-      ));
-    }
-
-    // Si no hay filtros, no mostramos nada
+    // Si no hay filtros "avanzados" (Precio u Orden), no mostramos nada
     if (activeChips.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -114,7 +83,6 @@ class ActiveFiltersW extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                // Botón "Borrar Todo"
                 InkWell(
                   onTap: () => controller.clearFilters(),
                   borderRadius: BorderRadius.circular(20),
@@ -133,7 +101,7 @@ class ActiveFiltersW extends StatelessWidget {
                         Icon(Symbols.close, size: 16, color: Colors.red),
                         SizedBox(width: 4),
                         Text(
-                          "Borrar",
+                          "Borrar Todo",
                           style: TextStyle(
                             color: Colors.red,
                             fontWeight: FontWeight.bold,
@@ -144,7 +112,7 @@ class ActiveFiltersW extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Resto de chips
+                // Resto de chips (Precio / Orden)
                 ...activeChips.map((c) => Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: c,
@@ -157,6 +125,7 @@ class ActiveFiltersW extends StatelessWidget {
     );
   }
 
+  // Helper para construir el Chip visualmente
   Widget _buildChip({required String label, required VoidCallback onDeleted}) {
     return Chip(
       label: Text(
