@@ -12,8 +12,9 @@ import 'package:anttec_movil/app/ui/layout/widgets/home/search_w.dart';
 import 'package:anttec_movil/app/ui/layout/widgets/home/pagination_controls_w.dart';
 import 'package:anttec_movil/app/ui/layout/widgets/home/category_filter_w.dart';
 import 'package:anttec_movil/app/ui/layout/widgets/home/section_title_w.dart';
+// ✅ IMPORTANTE: El widget para ver y borrar filtros activos
+import 'package:anttec_movil/app/ui/layout/widgets/home/active_filters_w.dart';
 import 'package:anttec_movil/app/ui/product/screen/products_grid.dart';
-// Importar el nuevo widget de paginación
 
 class ProductsScreen extends StatefulWidget {
   final String token;
@@ -50,12 +51,13 @@ class _ProductsScreenState extends State<ProductsScreen>
         builder: (context, controller, _) {
           return Column(
             children: [
-              // --- HEADER Y FILTROS (Igual que antes) ---
+              // --- HEADER Y CONTROLES SUPERIORES ---
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Column(
                   children: [
+                    // 1. Header (Perfil / Logout)
                     HeaderHomeW(
                       profileName: layoutModel.profileName ?? '',
                       logout: () async {
@@ -65,6 +67,8 @@ class _ProductsScreenState extends State<ProductsScreen>
                         }
                       },
                     ),
+
+                    // 2. Buscador
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: SearchW(
@@ -73,39 +77,47 @@ class _ProductsScreenState extends State<ProductsScreen>
                         onClear: () => controller.clearSearch(),
                       ),
                     ),
+
+                    // 3. Filtro Rápido de Categorías (Scroll horizontal)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: CategoryFilterW(
                         categories: layoutModel.categories,
                         brands: layoutModel.brands,
                         onFilterChanged: (int? categoryId, int? brandId) {
-                          controller.applyFilters(
+                          controller.applyQuickFilter(
                             category: categoryId,
                             brand: brandId,
                           );
                         },
                       ),
                     ),
+
+                    // 4. Título y Botón "Filtros" (Abre el Modal)
                     const SectionTitleW(),
+
+                    // 5. ✅ CHIPS DE FILTROS ACTIVOS (La solución para "salir de filtros")
+                    // Esto mostrará las pastillas con "X" cuando apliques precio, marca, etc.
+                    const ActiveFiltersW(),
                   ],
                 ),
               ),
 
-              // --- CONTENIDO DE PRODUCTOS ---
+              // --- GRID DE PRODUCTOS ---
               Expanded(
                 child: _buildProductContent(controller),
               ),
 
-              // 🔥 AQUÍ ESTÁN LOS BOTONES 1-2-3-4 🔥
-              // Solo se muestran si no está cargando y hay productos
+              // --- PAGINACIÓN (1-2-3-4) ---
+              // Solo se muestra si hay productos y no está cargando
               if (!controller.loading && controller.products.isNotEmpty)
                 Container(
-                  color: Colors.white, // Fondo blanco para los botones
+                  color: Colors.white,
                   child: PaginationControlsW(
                     currentPage: controller.page,
                     lastPage: controller.lastPage,
                     onPageChanged: (newPage) {
-                      // Al cambiar de página, subimos el scroll al inicio suavemente
+                      // Scroll al inicio suavemente
                       if (_scrollController.hasClients) {
                         _scrollController.animateTo(
                           0,
@@ -125,10 +137,12 @@ class _ProductsScreenState extends State<ProductsScreen>
   }
 
   Widget _buildProductContent(ProductsController controller) {
+    // Caso: Cargando
     if (controller.loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Caso: Error
     if (controller.error != null) {
       return Center(
         child: Column(
@@ -145,15 +159,16 @@ class _ProductsScreenState extends State<ProductsScreen>
       );
     }
 
+    // Caso: Lista Vacía
     if (controller.products.isEmpty) {
       return const Center(child: Text('No hay productos disponibles.'));
     }
 
-    // Grid Normal (sin loader al final porque ahora usamos paginación)
+    // Caso: Lista con Datos
     return ProductGrid(
       products: controller.products,
       scrollController: _scrollController,
-      isLoadingMore: false, // Ya no necesitamos loader de scroll infinito
+      isLoadingMore: false, // Paginación clásica no usa infinite scroll
     );
   }
 }

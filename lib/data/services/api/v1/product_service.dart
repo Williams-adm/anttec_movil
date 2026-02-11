@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 class ProductService extends ApiService {
   ProductService() : super();
 
+  /// Obtener todos los productos con filtros y paginación
   Future<ProductResponse> productAll({
     int page = 1,
     int? brand,
@@ -14,6 +15,9 @@ class ProductService extends ApiService {
     int? category,
     int? subcategory,
     String? search,
+    // ✅ NUEVOS PARÁMETROS PARA ORDENAMIENTO
+    String? orderBy,
+    String? orderDir,
   }) async {
     try {
       final Map<String, dynamic> queryParams = {
@@ -21,12 +25,18 @@ class ProductService extends ApiService {
         'per_page': 16,
       };
 
+      // --- FILTROS ---
       if (brand != null) queryParams['brand'] = brand;
       if (priceMin != null) queryParams['priceMin'] = priceMin;
       if (priceMax != null) queryParams['priceMax'] = priceMax;
       if (category != null) queryParams['category'] = category;
       if (subcategory != null) queryParams['subcategory'] = subcategory;
       if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+      // ✅ --- ORDENAMIENTO ---
+      // Si el controlador envía 'price' y 'desc', aquí se agregan a la URL
+      if (orderBy != null) queryParams['order_by'] = orderBy;
+      if (orderDir != null) queryParams['order_dir'] = orderDir;
 
       final response = await dio.get(
         '/mobile/products',
@@ -41,8 +51,7 @@ class ProductService extends ApiService {
     }
   }
 
-  /// Obtener el detalle.
-  /// ✅ CORRECCIÓN: Si variantId es 0, llamamos al producto base.
+  /// Obtener el detalle de un producto o variante
   Future<ProductDetailResponse> productDetail({
     required int productId,
     required int variantId,
