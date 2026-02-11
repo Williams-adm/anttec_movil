@@ -6,34 +6,21 @@ class ScanFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 40),
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 40),
       child: Column(
+        mainAxisSize: MainAxisSize
+            .min, // Hace que la columna ocupe el espacio mínimo necesario
         children: [
-          // Botón Galería
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: ScanStyles.galleryButtonBorder),
-              color: ScanStyles.galleryButtonBackground,
-            ),
-            child: const Icon(
-              Icons.photo_library,
-              color: ScanStyles.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(height: 15),
-
-          // Texto Modo
-          const Row(
+          // Solo mostramos el indicador del modo de escaneo
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.qr_code_scanner,
                 color: ScanStyles.accentColor,
-                size: 20,
+                size:
+                    24, // Aumenté un poco el tamaño para darle mejor jerarquía
               ),
               SizedBox(width: 8),
               Text(

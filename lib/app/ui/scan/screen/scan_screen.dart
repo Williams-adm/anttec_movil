@@ -47,7 +47,7 @@ class _ScanScreenState extends State<ScanScreen> {
             backgroundColor: ScanStyles.backgroundColor,
             body: Stack(
               children: [
-                // 1. CÁMARA
+                // 1. CÁMARA (Fondo total)
                 Positioned.fill(
                   child: MobileScanner(
                     controller: _controller.cameraController,
@@ -57,45 +57,49 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
                 ),
 
-                // 2. OVERLAY (Dibuja el recuadro y las esquinas)
+                // 2. OVERLAY (Dibuja el recuadro y las esquinas blancas)
                 const Positioned.fill(
                   child: ScanOverlay(),
                 ),
 
-                // 3. INTERFAZ UI
+                // 3. INTERFAZ DE USUARIO (Capas superiores)
                 SafeArea(
-                  child: Column(
+                  child: Stack(
                     children: [
-                      // Header (Flash, Cerrar)
-                      ScanHeader(controller: _controller),
+                      // Header: Flash y Botón Cerrar (Arriba)
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: ScanHeader(controller: _controller),
+                      ),
 
-                      const Spacer(),
-
-                      // Texto Instrucción
-                      // Le agregamos un Padding para que no esté pegado a los bordes
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 30),
-                        child: Text(
-                          "Coloque el código adentro del recuadro",
-                          textAlign: TextAlign.center,
-                          style: ScanStyles.instructionText,
+                      // 🔥 SOLUCIÓN AL TEXTO:
+                      // Lo centramos en la pantalla y le damos un "bottom padding"
+                      // igual a la mitad del recuadro + un margen extra.
+                      Center(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            bottom: ScanStyles.scanWindowSize.height + 60,
+                            left: 30,
+                            right: 30,
+                          ),
+                          child: const Text(
+                            "Coloque el código adentro del recuadro",
+                            textAlign: TextAlign.center,
+                            style: ScanStyles.instructionText,
+                          ),
                         ),
                       ),
 
-                      // 🔥 LA CORRECCIÓN ESTÁ AQUÍ:
-                      // Aumentamos el height para que el texto suba y no "cubra" las esquinas blancas.
-                      // Al poner + 40 en lugar de - 30, alejamos las palabras del recuadro.
-                      SizedBox(height: ScanStyles.scanWindowSize.height + 40),
-
-                      const Spacer(),
-
-                      // Footer (Galería, etc)
-                      const ScanFooter(),
+                      // Footer: Texto "Escanear" (Abajo)
+                      const Align(
+                        alignment: Alignment.bottomCenter,
+                        child: ScanFooter(),
+                      ),
                     ],
                   ),
                 ),
 
-                // 4. LOADER DE PROCESAMIENTO
+                // 4. LOADER DE PROCESAMIENTO (Capa frontal bloqueante)
                 if (_controller.isProcessing)
                   Container(
                     color: ScanStyles.loaderBackgroundColor,
