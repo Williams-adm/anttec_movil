@@ -5,7 +5,7 @@ class LoginResponse {
   final String message;
   final String token;
   final UserModel user;
-  final List<String> roles; // ✅ NUEVO CAMPO
+  final List<String> roles; // NUEVO CAMPO
 
   LoginResponse({
     required this.success,
@@ -27,7 +27,7 @@ class LoginResponse {
       message: json['message'] ?? '',
       token: json['token'] ?? '',
       user: UserModel.fromJson(json['user']),
-      roles: parsedRoles, // ✅ Asignamos los roles
+      roles: parsedRoles, // Asignamos los roles
     );
   }
 }

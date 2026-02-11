@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ✅ AQUÍ ESTÁ EL CAMBIO PARA SUBIR EL LOGO
+  //  AQUÍ ESTÁ EL CAMBIO PARA SUBIR EL LOGO
   Widget _buildHeader(Size size) {
     return Container(
       width: double.infinity,

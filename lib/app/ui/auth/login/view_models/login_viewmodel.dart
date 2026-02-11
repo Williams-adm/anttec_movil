@@ -52,16 +52,20 @@ class LoginViewModel extends ChangeNotifier {
           await _authRepository.login(email: email, password: password);
 
       if (result.success) {
-        // 🔒 SEGURIDAD: Validar Rol de Administrador
-        if (!result.roles.contains('admin')) {
+        // 🔒 SEGURIDAD: Validar Rol (Admin O Employee)
+        // ✅ CORRECCIÓN AQUÍ: Ahora preguntamos por ambos roles
+        final roles = result.roles;
+        final hasAccess = roles.contains('admin') || roles.contains('employee');
+
+        if (!hasAccess) {
           _errorMessage =
-              "Acceso denegado: No tienes permisos de administrador.";
+              "Acceso denegado: No tienes permisos de administrador ni empleado.";
           _isLoading = false;
           notifyListeners();
-          return false; // ⛔ Detenemos el login aquí
+          return false; // Detenemos el login aquí
         }
 
-        // ✅ Si es admin, continuamos...
+        // ✅ Si tiene permisos, continuamos...
         TextInput.finishAutofillContext(shouldSave: true);
 
         if (result.token.isNotEmpty) {
