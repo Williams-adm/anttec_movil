@@ -4,8 +4,8 @@ import 'package:material_symbols_icons/symbols.dart';
 
 class SearchW extends StatefulWidget {
   final TextEditingController controller;
-  final Function(String)? onChanged; // ✅ Callback cuando escribe
-  final VoidCallback? onClear; // ✅ Callback cuando limpia
+  final Function(String)? onChanged;
+  final VoidCallback? onClear;
 
   const SearchW({
     super.key,
@@ -19,23 +19,30 @@ class SearchW extends StatefulWidget {
 }
 
 class _SearchWState extends State<SearchW> {
+  // Para controlar el foco (cambio de color al tocar)
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
   bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
     _hasText = widget.controller.text.isNotEmpty;
-    // Escuchar cambios para mostrar/ocultar la X
-    widget.controller.addListener(_updateState);
+
+    // Listeners
+    widget.controller.addListener(_updateTextState);
+    _focusNode.addListener(_updateFocusState);
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_updateState);
+    widget.controller.removeListener(_updateTextState);
+    _focusNode.removeListener(_updateFocusState);
+    _focusNode.dispose();
     super.dispose();
   }
 
-  void _updateState() {
+  void _updateTextState() {
     if (mounted) {
       setState(() {
         _hasText = widget.controller.text.isNotEmpty;
@@ -43,61 +50,101 @@ class _SearchWState extends State<SearchW> {
     }
   }
 
+  void _updateFocusState() {
+    if (mounted) {
+      setState(() {
+        _isFocused = _focusNode.hasFocus;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8.0, bottom: 12.0, right: 3, left: 3),
-      decoration: BoxDecoration(
-        // Color cambia ligeramente si hay texto
-        color: _hasText ? AppColors.tertiaryS : AppColors.primaryS,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.lightdarkT.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: widget.controller,
-              onChanged: widget.onChanged, // ✅ Conectamos al padre
-              decoration: InputDecoration(
-                hintText: 'Buscar productos...',
-                hintStyle: const TextStyle(color: AppColors.semidarkT),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: const Icon(Symbols.search, size: 28, weight: 500),
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+    // Definimos colores según estado
+    final borderColor =
+        _isFocused ? AppColors.primaryP : Colors.grey.withValues(alpha: 0.2);
+    final bgColor = _isFocused
+        ? Colors.white
+        : const Color(0xFFF5F5F5); // Gris muy suave si no está en foco
 
-                // ✅ Botón "X" para limpiar
-                suffixIcon: _hasText
-                    ? IconButton(
-                        icon: const Icon(Symbols.close,
-                            size: 20, color: Colors.grey),
-                        onPressed: () {
-                          widget.controller.clear();
-                          if (widget.onClear != null) {
-                            widget.onClear!();
-                          } else if (widget.onChanged != null) {
-                            // Si no hay onClear, enviamos vacío al onChanged
-                            widget.onChanged!("");
-                          }
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor:
-                    Colors.transparent, // El color lo maneja el Container
-              ),
-            ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(30.0), // Cápsula
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: _isFocused
+            ? [
+                // Sombra suave solo cuando está enfocado
+                BoxShadow(
+                  color: AppColors.primaryP.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : [],
+      ),
+      child: TextField(
+        // Usamos TextField directo para más control visual
+        controller: widget.controller,
+        focusNode: _focusNode,
+        onChanged: widget.onChanged,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.w500,
+          fontSize: 15,
+        ),
+        cursorColor: AppColors.primaryP,
+        decoration: InputDecoration(
+          hintText: 'Buscar productos...',
+          hintStyle: TextStyle(
+            color: Colors.grey[500],
+            fontWeight: FontWeight.normal,
+            fontSize: 15,
           ),
-        ],
+          border: InputBorder.none, // Quitamos borde default
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+
+          // LUPA (Izquierda)
+          prefixIcon: Icon(
+            Symbols.search,
+            size: 24,
+            color: _isFocused ? AppColors.primaryP : Colors.grey[600],
+          ),
+
+          // BOTÓN "X" (Derecha) - Animado
+          suffixIcon: AnimatedOpacity(
+            opacity: _hasText ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 200),
+            child: _hasText
+                ? IconButton(
+                    splashRadius: 20, // Efecto splash pequeño
+                    icon: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300], // Fondo circular gris
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Symbols.close,
+                          size: 14, color: Colors.white),
+                    ),
+                    onPressed: () {
+                      widget.controller.clear();
+                      // Quitamos foco al limpiar para que se vea la animación de salida
+                      _focusNode.unfocus();
+                      if (widget.onClear != null) {
+                        widget.onClear!();
+                      } else if (widget.onChanged != null) {
+                        widget.onChanged!("");
+                      }
+                    },
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
       ),
     );
   }
