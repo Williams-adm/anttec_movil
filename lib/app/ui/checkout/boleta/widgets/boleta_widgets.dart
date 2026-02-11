@@ -11,7 +11,7 @@ class BoletaInputField extends StatelessWidget {
   final TextEditingController controller;
   final bool isNumeric;
   final int? maxLength;
-  final Color? borderColor; // ✅ NUEVO: Color de borde opcional
+  final Color? borderColor;
 
   const BoletaInputField({
     super.key,
@@ -20,7 +20,7 @@ class BoletaInputField extends StatelessWidget {
     required this.controller,
     this.isNumeric = false,
     this.maxLength,
-    this.borderColor, // ✅
+    this.borderColor,
   });
 
   @override
@@ -41,7 +41,6 @@ class BoletaInputField extends StatelessWidget {
           prefixIcon: Icon(icon, color: AppColors.primaryP),
           filled: true,
           fillColor: AppColors.primaryS,
-          // ✅ LÓGICA DE BORDE (Si borderColor no es null, se pinta)
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: borderColor != null
@@ -306,6 +305,7 @@ class DigitalWalletPanel extends StatelessWidget {
   final bool isLoadingQr;
   final String? qrImageUrl;
   final TextEditingController opController;
+  final VoidCallback? onQrTap; //  1. Nuevo parámetro para el toque
 
   const DigitalWalletPanel({
     super.key,
@@ -314,11 +314,11 @@ class DigitalWalletPanel extends StatelessWidget {
     required this.isLoadingQr,
     required this.qrImageUrl,
     required this.opController,
+    this.onQrTap, // 2. Agregar al constructor
   });
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Determinar longitud máxima visualmente
     int maxLen = selectedWallet == 'yape' ? 8 : 7;
 
     return Container(
@@ -337,21 +337,55 @@ class DigitalWalletPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
+
+          //  LÓGICA DE QR INTERACTIVO
           if (isLoadingQr)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
               child: CircularProgressIndicator(),
             )
           else if (qrImageUrl != null)
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: CachedNetworkImage(
-                imageUrl: qrImageUrl!,
-                height: 180,
-                placeholder: (context, url) =>
-                    const CircularProgressIndicator(),
-                errorWidget: (context, url, error) =>
-                    const Icon(Symbols.broken_image, size: 80),
+            GestureDetector(
+              onTap: onQrTap, //  3. Detectar el toque
+              child: Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: CachedNetworkImage(
+                        imageUrl: qrImageUrl!,
+                        height: 180,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const SizedBox(
+                            height: 180,
+                            child: Center(child: CircularProgressIndicator())),
+                        errorWidget: (context, url, error) => const SizedBox(
+                            height: 180,
+                            child: Icon(Symbols.broken_image, size: 60)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.touch_app,
+                          size: 16, color: AppColors.primaryP),
+                      SizedBox(width: 4),
+                      Text(
+                        "Toca para ampliar",
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primaryP,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  )
+                ],
               ),
             )
           else
@@ -360,14 +394,13 @@ class DigitalWalletPanel extends StatelessWidget {
               child: Icon(Symbols.qr_code_2, size: 80, color: Colors.grey),
             ),
 
-          // ✅ INPUT CON BORDE NEGRO Y LONGITUD DINÁMICA
           BoletaInputField(
             label: "Nro. Operación",
             icon: Symbols.receipt_long,
             controller: opController,
             isNumeric: true,
             maxLength: maxLen,
-            borderColor: Colors.black, // Borde negro solicitado
+            borderColor: Colors.black,
           ),
         ],
       ),
@@ -484,7 +517,6 @@ class OtherPaymentPanel extends StatelessWidget {
   }
 }
 
-// --- E. RESUMEN DE MONTO ---
 class AmountSummary extends StatelessWidget {
   final double total;
   const AmountSummary({super.key, required this.total});
@@ -521,7 +553,6 @@ class AmountSummary extends StatelessWidget {
   }
 }
 
-// --- F. FOOTER Y BOTÓN FINAL ---
 class BoletaFooter extends StatelessWidget {
   final double total;
   final bool isProcessing;

@@ -64,6 +64,53 @@ class _BoletaScreenState extends State<BoletaScreen> {
     super.dispose();
   }
 
+  // --- LÓGICA DE ZOOM DE QR ---
+  void _mostrarQrExpandido() {
+    if (_qrImageUrl == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Imagen con Zoom (InteractiveViewer)
+            InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Image.network(
+                  _qrImageUrl!,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            // Botón de cerrar
+            Positioned(
+              top: 0,
+              right: 0,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _buscarDni() async {
     final dni = _docNumberController.text.trim();
     if (dni.length != 8) return;
@@ -294,7 +341,9 @@ class _BoletaScreenState extends State<BoletaScreen> {
                     },
                     isLoadingQr: _isLoadingQr,
                     qrImageUrl: _qrImageUrl,
-                    opController: _opController),
+                    opController: _opController,
+                    onQrTap:
+                        _mostrarQrExpandido), // ✅ Pasamos la función de zoom
               if (_selectedPayment == 'otros')
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

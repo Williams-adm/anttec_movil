@@ -77,6 +77,53 @@ class _FacturaScreenState extends State<FacturaScreen> {
     super.dispose();
   }
 
+  // --- LÓGICA DE ZOOM DE QR (Igual que en Boleta) ---
+  void _mostrarQrExpandido() {
+    if (_qrImageUrl == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Imagen con Zoom (InteractiveViewer)
+            InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Image.network(
+                  _qrImageUrl!,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            // Botón de cerrar
+            Positioned(
+              top: 0,
+              right: 0,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _buscarRuc() async {
     final ruc = _rucController.text.trim();
     if (ruc.length != 11) return;
@@ -310,14 +357,16 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     onChanged: (_) => _calculateChange(total)),
               if (_selectedPayment == 'yape')
                 DigitalWalletPanel(
-                    selectedWallet: _digitalWallet,
-                    onWalletChanged: (v) {
-                      setState(() => _digitalWallet = v);
-                      _cargarImagenQr(v);
-                    },
-                    isLoadingQr: _isLoadingQr,
-                    qrImageUrl: _qrImageUrl,
-                    opController: _opController),
+                  selectedWallet: _digitalWallet,
+                  onWalletChanged: (v) {
+                    setState(() => _digitalWallet = v);
+                    _cargarImagenQr(v);
+                  },
+                  isLoadingQr: _isLoadingQr,
+                  qrImageUrl: _qrImageUrl,
+                  opController: _opController,
+                  onQrTap: _mostrarQrExpandido, // Pasamos la función aquí
+                ),
               if (_selectedPayment == 'otros')
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
