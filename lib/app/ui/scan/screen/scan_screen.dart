@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:go_router/go_router.dart'; // ✅ Necesario para la navegación
+import 'package:go_router/go_router.dart';
 
 // Imports de estilos y lógica
 import 'package:anttec_movil/app/ui/scan/styles/scan_styles.dart';
@@ -29,17 +29,15 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 SOLUCIÓN AQUÍ: PopScope intercepta el botón físico "Atrás"
     return PopScope(
-      canPop: false, // 1. Le decimos al sistema: "No cierres la app todavía"
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return; // Si ya se gestionó, no hacemos nada.
+        if (didPop) return;
 
-        // 2. Ejecutamos nuestra lógica manual
         if (context.canPop()) {
-          context.pop(); // Si hay historial, vuelve atrás normal.
+          context.pop();
         } else {
-          context.goNamed('home'); // Si no hay historial, ¡fuerza ir al Home!
+          context.goNamed('home');
         }
       },
       child: ListenableBuilder(
@@ -59,7 +57,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
                 ),
 
-                // 2. OVERLAY
+                // 2. OVERLAY (Dibuja el recuadro y las esquinas)
                 const Positioned.fill(
                   child: ScanOverlay(),
                 ),
@@ -68,28 +66,36 @@ class _ScanScreenState extends State<ScanScreen> {
                 SafeArea(
                   child: Column(
                     children: [
-                      // Header
+                      // Header (Flash, Cerrar)
                       ScanHeader(controller: _controller),
 
                       const Spacer(),
 
                       // Texto Instrucción
-                      const Text(
-                        "Coloque el código adentro del recuadro",
-                        style: ScanStyles.instructionText,
+                      // Le agregamos un Padding para que no esté pegado a los bordes
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 30),
+                        child: Text(
+                          "Coloque el código adentro del recuadro",
+                          textAlign: TextAlign.center,
+                          style: ScanStyles.instructionText,
+                        ),
                       ),
 
-                      SizedBox(height: ScanStyles.scanWindowSize.height - 30),
+                      // 🔥 LA CORRECCIÓN ESTÁ AQUÍ:
+                      // Aumentamos el height para que el texto suba y no "cubra" las esquinas blancas.
+                      // Al poner + 40 en lugar de - 30, alejamos las palabras del recuadro.
+                      SizedBox(height: ScanStyles.scanWindowSize.height + 40),
 
                       const Spacer(),
 
-                      // Footer
+                      // Footer (Galería, etc)
                       const ScanFooter(),
                     ],
                   ),
                 ),
 
-                // 4. LOADER
+                // 4. LOADER DE PROCESAMIENTO
                 if (_controller.isProcessing)
                   Container(
                     color: ScanStyles.loaderBackgroundColor,
@@ -97,9 +103,15 @@ class _ScanScreenState extends State<ScanScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircularProgressIndicator(color: ScanStyles.white),
-                          SizedBox(height: 15),
-                          Text("Procesando...", style: ScanStyles.loadingText),
+                          CircularProgressIndicator(
+                            color: ScanStyles.white,
+                            strokeWidth: 3,
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            "Procesando producto...",
+                            style: ScanStyles.loadingText,
+                          ),
                         ],
                       ),
                     ),
