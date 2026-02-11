@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:go_router/go_router.dart'; // ✅ Importar GoRouter
+import 'package:go_router/go_router.dart';
 import 'package:anttec_movil/app/ui/product/screen/products_screen.dart';
-
-// No necesitamos importar chat_screen aqui porque usaremos la ruta '/chat'
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,24 +41,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Estado de Carga Inicial (Obteniendo Token)
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (_token == null || _token!.isEmpty) {
       return const Scaffold(
-        body: Center(child: Text('Error: No se encontró token de sesión')),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
+    // 2. Estado de Error (Sin Token)
+    if (_token == null || _token!.isEmpty) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Error: No se encontró sesión activa'),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => context.go('/login'),
+                child: const Text("Ir al Login"),
+              )
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 3. Pantalla Principal
     return Scaffold(
-      // Aquí llamamos a la pantalla que tiene la lista (y el error de navegación)
+      // Llamamos a ProductsScreen donde está el Buscador y la Lista
       body: ProductsScreen(token: _token!),
 
-      // ✅ BOTÓN FLOTANTE CHAT (Optimizado)
+      // BOTÓN FLOTANTE CHAT (IA)
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Usamos push para ir al chat sin borrar el home
           context.push('/chat');
         },
         backgroundColor: const Color(0xFF7E33A3),

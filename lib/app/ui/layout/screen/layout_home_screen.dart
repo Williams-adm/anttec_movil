@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 class LayoutHomeScreen extends StatefulWidget {
   final Widget content;
 
-  // ✅ CORREGIDO: Ya no pedimos el viewmodel aquí.
+  // CORREGIDO: Ya no pedimos el viewmodel aquí.
   const LayoutHomeScreen({
     super.key,
     required this.content,
@@ -32,7 +32,7 @@ class _LayoutHomeScreenState extends State<LayoutHomeScreen> {
     // 2. ESCUCHAMOS ERRORES
     _viewModel.addListener(_viewModelListener);
 
-    // ⛔️ IMPORTANTE: NO cargamos datos aquí (loadProfile/loadCategories).
+    //  IMPORTANTE: NO cargamos datos aquí (loadProfile/loadCategories).
     // El Provider Global en 'providers.dart' ya lo hizo con '..init()'.
     // Si lo hacemos aquí, se reiniciaría la lista al volver del producto.
   }

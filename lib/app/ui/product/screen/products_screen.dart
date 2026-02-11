@@ -8,7 +8,7 @@ import 'package:anttec_movil/app/ui/product/controllers/products_controller.dart
 
 // --- WIDGETS ---
 import 'package:anttec_movil/app/ui/layout/widgets/home/header_home_w.dart';
-import 'package:anttec_movil/app/ui/layout/widgets/home/search_w.dart';
+import 'package:anttec_movil/app/ui/layout/widgets/home/search_w.dart'; // ✅ Asegúrate que apunte al SearchW nuevo
 import 'package:anttec_movil/app/ui/layout/widgets/home/category_filter_w.dart';
 import 'package:anttec_movil/app/ui/layout/widgets/home/section_title_w.dart';
 import 'package:anttec_movil/app/ui/product/screen/products_grid.dart';
@@ -21,13 +21,11 @@ class ProductsScreen extends StatefulWidget {
   State<ProductsScreen> createState() => _ProductsScreenState();
 }
 
-// 🔥 1. AGREGAMOS EL MIXIN AQUÍ
 class _ProductsScreenState extends State<ProductsScreen>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
 
-  // 🔥 2. ACTIVAMOS EL "MANTENER VIVO"
   @override
   bool get wantKeepAlive => true;
 
@@ -40,12 +38,12 @@ class _ProductsScreenState extends State<ProductsScreen>
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 3. OBLIGATORIO LLAMAR A SUPER.BUILD
     super.build(context);
 
     final layoutModel = context.watch<LayoutHomeViewmodel>();
 
     return ChangeNotifierProvider(
+      // Asegúrate que ProductsController tenga la lógica de 'onSearchChanged' que hicimos antes
       create: (_) => ProductsController(token: widget.token),
       child: Consumer<ProductsController>(
         builder: (context, controller, _) {
@@ -75,10 +73,24 @@ class _ProductsScreenState extends State<ProductsScreen>
                           }
                         },
                       ),
+
+                      // 🔥 AQUÍ ESTÁ LA CONEXIÓN DEL BUSCADOR 🔥
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: SearchW(controller: _searchController),
+                        child: SearchW(
+                          controller: _searchController,
+                          // 1. Cuando el usuario escribe:
+                          onChanged: (value) {
+                            // Llamamos a la función con Debounce del controlador
+                            controller.onSearchChanged(value);
+                          },
+                          // 2. Cuando el usuario presiona la 'X' para limpiar:
+                          onClear: () {
+                            controller.clearSearch();
+                          },
+                        ),
                       ),
+
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: CategoryFilterW(
@@ -127,7 +139,22 @@ class _ProductsScreenState extends State<ProductsScreen>
     }
 
     if (controller.products.isEmpty) {
-      return const Center(child: Text('No hay productos disponibles.'));
+      // Mensaje amigable si buscó algo y no encontró nada
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off, size: 60, color: Colors.grey),
+            const SizedBox(height: 10),
+            Text(
+              _searchController.text.isNotEmpty
+                  ? 'No hay resultados para "${_searchController.text}"'
+                  : 'No hay productos disponibles.',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
     }
 
     return ProductGrid(
