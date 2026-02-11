@@ -11,10 +11,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # --- INTELIGENCIA ARTIFICIAL ---
-  langchain: ^0.8.0
-  langchain_mistralai: ^0.3.1+1
-
   # --- DISEÑO Y FORMATO ---
   flutter_markdown: ^0.7.1
   flutter_spinkit: ^5.2.1
@@ -54,7 +50,7 @@ dependencies:
 
   # --- MANEJO DE DOCUMENTOS Y PDF ---
   path_provider: ^2.1.5
-  flutter_pdfview: ^1.4.4
+  # flutter_pdfview: ^1.4.4  <-- Opcional: Si solo usas Syncfusion, puedes quitar este también
   syncfusion_flutter_pdfviewer: ^32.2.3
   
   # ✅ VITAL PARA TICKETERA: Convierte PDF a Imagen
@@ -80,7 +76,6 @@ flutter:
   uses-material-design: true
 
   # CONFIGURACIÓN DE ASSETS
-  # Asegúrate de que tu logo esté en: assets/img/logo.png
   assets:
     - assets/img/
 
